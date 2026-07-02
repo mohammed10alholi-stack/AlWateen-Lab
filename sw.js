@@ -1,5 +1,5 @@
 // ملف خدمة بسيط — يجعل التطبيق قابلاً للتثبيت ويسرّع الفتح
-const CACHE = "alwateen-v3";
+const CACHE = "alwateen-v2";
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
