@@ -106,7 +106,11 @@
   .fr{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:14px}
   .fr:last-child{border-bottom:0}
   .fr .fl{color:var(--muted);flex:1;min-width:0}
-  .fr .fv{font-weight:700;text-align:left;direction:ltr;white-space:nowrap}
+  .fr .fv{font-weight:700;text-align:left;direction:ltr;white-space:nowrap;flex-shrink:0}
+  /* القوائم الطويلة تنزل سطراً كاملاً تحت عنوانها بدل أن تفيض خارج الصفحة */
+  .fr.stack{display:block}
+  .fr.stack .fl{display:block}
+  .fr.stack .fv{display:block;white-space:normal;overflow-wrap:anywhere;text-align:right;direction:rtl;margin-top:4px;line-height:1.7}
   .sens{width:100%;border-collapse:collapse;margin-top:4px;font-size:13px}
   .sens th{font-size:11px;color:var(--muted);font-weight:700;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
   .sens td{padding:5px 6px;border-bottom:1px dashed var(--line);direction:ltr;text-align:right}
@@ -115,6 +119,12 @@
   .sir.S{background:#EAF6EF;color:#1E6B45}
   .sir.I{background:#FBF3E0;color:var(--low)}
   .sir.R{background:#FCEAE8;color:var(--high)}
+  .reftbl{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+  .reftbl .rt{font-weight:800;font-size:13px;color:var(--maroon);text-align:center;margin-bottom:8px;line-height:1.4}
+  .reftbl table{width:100%;border-collapse:collapse;font-size:13px}
+  .reftbl td{padding:4px 8px;border-bottom:1px dashed var(--line)}
+  .reftbl td:last-child{direction:ltr;text-align:left;font-weight:700}
+  .reftbl tr:last-child td{border-bottom:0}
   .note{
     margin-top:24px;background:#fff;border:1px solid var(--line);
     border-right:3px solid var(--gold);border-radius:12px;padding:14px;
@@ -173,6 +183,15 @@
   var KEY = 'AIzaSyDJYzJ9q71xKGIPMD2t7URFEEzLa3gb1_E';
   var app = document.getElementById('app');
 
+  var BHCG_ROWS = [
+    ['Non-pregnant','<5'],['2-3 weeks','5-50'],['4 weeks','40-1,000'],['5 weeks','404-20,700'],
+    ['6 weeks','2,200-74,200'],['7 weeks','6,000-130,000'],['8 weeks','12,900-190,000'],
+    ['9 weeks','18,500-250,000'],['10 weeks','18,000-200,000'],['11 weeks','16,500-180,000'],
+    ['12 weeks','14,500-125,000'],['13 weeks','12,500-95,000'],['14 weeks','10,500-80,000'],
+    ['15 weeks','9,000-70,000'],['16 weeks','7,500-64,000'],['17 weeks','5,500-56,000'],
+    ['18 weeks','4,500-50,000'],['19 weeks','3,300-40,000'],['20 weeks','2,500-32,000'],['21 weeks','1,800-25,000']
+  ];
+
   var TAG = {
     normal:        ['طبيعي', 'ok'],
     high:          ['مرتفع ↑', 'hi'],
@@ -225,7 +244,7 @@
           return;
         }
         if (f.type === 'list') {
-          h += '<div class="fr"><span class="fl">' + esc(f.label) + '</span><span class="fv">' +
+          h += '<div class="fr stack"><span class="fl">' + esc(f.label) + '</span><span class="fv">' +
                f.items.map(function (i) { return esc(i.name) + ' ' + esc(i.value); }).join(' · ') +
                '</span></div>';
           return;
@@ -279,6 +298,17 @@
         html += '</div></div>';
       });
     });
+
+    var hasHcg = rows.some(function (r) {
+      return r.code === 'BHCG' || /hcg/i.test(String(r.name || '') + String(r.nameAr || ''));
+    });
+    if (hasHcg) {
+      html += '<div class="reftbl"><div class="rt">Normal Serum hCG During Pregnancy (mIU/mL)</div><table>';
+      BHCG_ROWS.forEach(function (r) {
+        html += '<tr><td>' + esc(r[0]) + '</td><td class="num">' + esc(r[1]) + '</td></tr>';
+      });
+      html += '</table></div>';
+    }
 
     html += '<div class="note">هذه النتيجة للاطلاع. القراءة النهائية وربطها بحالتك الصحية عند طبيبك — ' +
             'لا تبدأ أو توقف أي علاج بناءً على هذه الصفحة وحدها.</div>';
