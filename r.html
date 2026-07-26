@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#6B1B33">
+<title>نتيجة الفحص — مختبر الوتين الطبي</title>
+<style>
+  :root{
+    --maroon:#6B1B33;
+    --maroon-deep:#4A0F22;
+    --gold:#C9A227;
+    --rose:#B5566E;
+    --paper:#FBF8F6;
+    --ink:#241017;
+    --muted:#8A7079;
+    --line:#EADFE2;
+    --high:#B3261E;
+    --low:#9A6700;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Naskh Arabic","Geeza Pro",Tahoma,sans-serif;
+    font-size:16px;line-height:1.6;
+    -webkit-text-size-adjust:100%;
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+  /* ── الترويسة ── */
+  .top{
+    background:linear-gradient(180deg,var(--maroon) 0%,var(--maroon-deep) 100%);
+    color:#fff;padding:22px 20px 18px;
+    padding-top:calc(22px + env(safe-area-inset-top));
+  }
+  .top h1{margin:0;font-size:19px;font-weight:800;letter-spacing:-.2px}
+  .top .sub{font-size:12px;opacity:.72;margin-top:2px}
+  .rule{height:2px;background:linear-gradient(90deg,var(--gold),transparent);margin-top:14px;border-radius:2px}
+
+  .wrap{max-width:640px;margin:0 auto;padding:0 14px 40px}
+
+  /* ── بطاقة المريض ── */
+  .who{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:16px;margin-top:-14px;position:relative;
+    box-shadow:0 6px 20px rgba(74,15,34,.07);
+  }
+  .who .name{font-size:20px;font-weight:800;line-height:1.3}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{
+    font-size:12px;color:var(--muted);background:#F7F1F3;
+    border:1px solid var(--line);border-radius:999px;padding:3px 10px;
+  }
+  .chip b{color:var(--ink);font-weight:700}
+
+  /* ── مجموعة الفحوصات ── */
+  .cat{
+    margin:22px 0 8px;font-size:12px;font-weight:800;letter-spacing:.6px;
+    color:var(--maroon);text-transform:uppercase;
+    display:flex;align-items:center;gap:8px;
+  }
+  .cat::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  /* ── صف النتيجة — العنصر المميّز ── */
+  .row{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    padding:13px 14px 13px 14px;margin-bottom:8px;
+    border-right:3px solid transparent;
+    display:flex;align-items:flex-start;gap:12px;
+  }
+  .row.flag-high,.row.flag-critical_high,.row.flag-abnormal{border-right-color:var(--high)}
+  .row.flag-low,.row.flag-critical_low{border-right-color:var(--low)}
+  .row .meta{flex:1;min-width:0}
+  .row .tname{font-weight:700;font-size:15px;line-height:1.35}
+  .row .ten{font-size:12px;color:var(--muted);direction:ltr;text-align:right}
+  .row .ref{font-size:12px;color:var(--muted);margin-top:6px}
+  .row .val{
+    text-align:center;min-width:88px;flex-shrink:0;
+    border-bottom:2px solid var(--gold);padding-bottom:4px;
+  }
+  .row.flag-high .val,.row.flag-critical_high .val,.row.flag-abnormal .val{border-bottom-color:var(--high)}
+  .row.flag-low .val,.row.flag-critical_low .val{border-bottom-color:var(--low)}
+  .row .v{font-size:23px;font-weight:800;line-height:1.15;word-break:break-word}
+  .row.flag-high .v,.row.flag-critical_high .v,.row.flag-abnormal .v{color:var(--high)}
+  .row.flag-low .v,.row.flag-critical_low .v{color:var(--low)}
+  .row .unit{font-size:11px;color:var(--muted);margin-top:2px}
+  .tag{
+    display:inline-block;font-size:11px;font-weight:700;margin-top:6px;
+    padding:2px 8px;border-radius:999px;background:#F7F1F3;color:var(--muted);
+  }
+  .tag.hi{background:#FCEAE8;color:var(--high)}
+  .tag.lo{background:#FBF3E0;color:var(--low)}
+  .tag.crit{background:var(--high);color:#fff}
+  .tag.ok{background:#EAF6EF;color:#1E6B45}
+
+  /* ── تذييل ── */
+  .note{
+    margin-top:24px;background:#fff;border:1px solid var(--line);
+    border-right:3px solid var(--gold);border-radius:12px;padding:14px;
+    font-size:13px;color:var(--muted);line-height:1.7;
+  }
+  .foot{margin-top:18px;text-align:center;font-size:12px;color:var(--muted);line-height:1.9}
+  .foot a{color:var(--maroon);text-decoration:none;font-weight:700}
+  .amend{
+    background:#FBF3E0;border:1px solid #E8D6A8;color:#7A5A00;
+    border-radius:10px;padding:10px 12px;font-size:13px;margin-top:14px;font-weight:600;
+  }
+
+  /* ── حالات ── */
+  .brandimg{display:block;width:100%;height:auto}
+  #brandTop.has-img .top{display:none}
+  #brandBottom{margin-top:26px}
+  .state{text-align:center;padding:60px 24px;color:var(--muted)}
+  .state h2{color:var(--ink);font-size:18px;margin:0 0 8px}
+  .state p{margin:0;font-size:14px;line-height:1.8}
+  .spin{
+    width:26px;height:26px;margin:0 auto 16px;border-radius:50%;
+    border:3px solid var(--line);border-top-color:var(--maroon);
+    animation:sp .8s linear infinite;
+  }
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+  .retry{
+    margin-top:16px;background:var(--maroon);color:#fff;border:0;
+    border-radius:10px;padding:10px 22px;font-size:14px;font-weight:700;
+    font-family:inherit;cursor:pointer;
+  }
+  .retry:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div id="brandTop">
+  <div class="top" id="fallbackTop">
+    <div class="wrap" style="padding-bottom:0">
+      <h1 id="labName">مختبر الوتين الطبي</h1>
+      <div class="sub">تقرير نتائج مخبرية</div>
+      <div class="rule"></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap"><div id="app">
+  <div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div>
+</div></div>
+
+<div id="brandBottom"></div>
+
+<script>
+(function () {
+  var PROJECT = 'alwateen-lab';
+  var KEY = 'AIzaSyDJYzJ9q71xKGIPMD2t7URFEEzLa3gb1_E';
+  var app = document.getElementById('app');
+
+  var TAG = {
+    normal:        ['طبيعي', 'ok'],
+    high:          ['مرتفع ↑', 'hi'],
+    low:           ['منخفض ↓', 'lo'],
+    critical_high: ['حرج مرتفع', 'crit'],
+    critical_low:  ['حرج منخفض', 'crit'],
+    abnormal:      ['غير طبيعي', 'hi']
+  };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function state(title, body, showRetry) {
+    app.innerHTML = '<div class="state"><h2>' + esc(title) + '</h2><p>' + body + '</p>' +
+      (showRetry ? '<button class="retry" id="rt">حاول مرة أخرى</button>' : '') + '</div>';
+    var b = document.getElementById('rt');
+    if (b) b.onclick = load;
+  }
+
+  function fmtDate(s) {
+    if (!s) return '';
+    var d = new Date(String(s).replace(' ', 'T'));
+    if (isNaN(d.getTime())) return s;
+    try {
+      return d.toLocaleDateString('ar-EG', {
+        year: 'numeric', month: 'long', day: 'numeric', numberingSystem: 'latn'
+      });
+    } catch (e) { return s; }
+  }
+
+  function render(d) {
+    var lab = d.lab || {}, p = d.patient || {}, o = d.order || {}, rows = d.rows || [];
+    if (lab.name) document.getElementById('labName').textContent = lab.name;
+
+    var html = '<div class="who"><div class="name">' + esc(p.name) + '</div><div class="chips">';
+    if (p.gender)  html += '<span class="chip">' + (p.gender === 'F' ? 'أنثى' : 'ذكر') + '</span>';
+    if (p.ageText) html += '<span class="chip">' + esc(p.ageText) + '</span>';
+    if (o.code)    html += '<span class="chip num">طلب <b>' + esc(o.code) + '</b></span>';
+    if (o.date)    html += '<span class="chip">' + esc(fmtDate(o.date)) + '</span>';
+    html += '</div></div>';
+
+    if (o.amended > 0) {
+      html += '<div class="amend">هذا التقرير مُعدَّل — اعتمد على هذه النسخة وتجاهل أي نسخة أقدم.</div>';
+    }
+
+    // تجميع حسب الفئة مع الحفاظ على ترتيب ورودها
+    var order = [], groups = {};
+    rows.forEach(function (r) {
+      var c = r.category || 'فحوصات';
+      if (!groups[c]) { groups[c] = []; order.push(c); }
+      groups[c].push(r);
+    });
+
+    order.forEach(function (cat) {
+      html += '<div class="cat">' + esc(cat) + '</div>';
+      groups[cat].forEach(function (r) {
+        var t = TAG[r.flag];
+        html += '<div class="row flag-' + esc(r.flag || 'none') + '">';
+        html += '<div class="meta"><div class="tname">' + esc(r.nameAr || r.name) + '</div>';
+        if (r.name && r.nameAr && r.name !== r.nameAr) {
+          html += '<div class="ten">' + esc(r.name) + '</div>';
+        }
+        if (r.reference) html += '<div class="ref">المعدّل الطبيعي: ' + esc(r.reference) + '</div>';
+        if (t) html += '<span class="tag ' + t[1] + '">' + t[0] + '</span>';
+        html += '</div><div class="val"><div class="v num">' + esc(r.value || '—') + '</div>';
+        if (r.unit) html += '<div class="unit">' + esc(r.unit) + '</div>';
+        html += '</div></div>';
+      });
+    });
+
+    html += '<div class="note">هذه النتيجة للاطلاع. القراءة النهائية وربطها بحالتك الصحية عند طبيبك — ' +
+            'لا تبدأ أو توقف أي علاج بناءً على هذه الصفحة وحدها.</div>';
+
+    // إذا كانت صورة الذيل موجودة فهي تغني عن العنوان النصّي
+    if (window.__brand && window.__brand.footerImg) { app.innerHTML = html; return; }
+
+    html += '<div class="foot">';
+    if (lab.name) html += esc(lab.name) + '<br>';
+    if (lab.address) html += esc(lab.address) + '<br>';
+    if (lab.phone) {
+      var tel = String(lab.phone).split(/[^0-9+]/)[0];
+      html += '<a class="num" href="tel:' + esc(tel) + '">' + esc(lab.phone) + '</a>';
+    }
+    html += '</div>';
+
+    app.innerHTML = html;
+  }
+
+  function paintBrand(b) {
+    if (!b) return;
+    if (b.name) { var el = document.getElementById('labName'); if (el) el.textContent = b.name; }
+    if (b.headerImg) {
+      var t = document.getElementById('brandTop');
+      t.classList.add('has-img');
+      t.insertAdjacentHTML('afterbegin', '<img class="brandimg" alt="" src="' + b.headerImg + '">');
+    }
+    if (b.footerImg) {
+      document.getElementById('brandBottom').innerHTML =
+        '<img class="brandimg" alt="" src="' + b.footerImg + '">';
+    }
+    window.__brand = b;
+  }
+
+  function loadBrand() {
+    // من الذاكرة المحلية أولاً — حتى لا تُحمّل الصور مع كل فتحة
+    try {
+      var c = localStorage.getItem('alwateen_brand');
+      if (c) paintBrand(JSON.parse(c));
+    } catch (e) { /* لا يهم */ }
+
+    fetch(docUrl('_brand'))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var raw = j && j.fields && j.fields.data && j.fields.data.stringValue;
+        if (!raw) return;
+        try { localStorage.setItem('alwateen_brand', raw); } catch (e) { /* ممتلئ */ }
+        if (!window.__brand) paintBrand(JSON.parse(raw));
+      })
+      .catch(function () { /* الترويسة ليست ضرورية لعرض النتيجة */ });
+  }
+
+  function docUrl(id) {
+    return 'https://firestore.googleapis.com/v1/projects/' + PROJECT +
+           '/databases/(default)/documents/results/' + encodeURIComponent(id) + '?key=' + KEY;
+  }
+
+  function load() {
+    var code = new URLSearchParams(location.search).get('c');
+    if (!code || !/^[a-f0-9]{16,64}$/i.test(code)) {
+      state('الرابط غير مكتمل',
+        'امسح الباركود من ورقة النتيجة مرة أخرى، أو افتح الرابط كاملاً كما هو.');
+      return;
+    }
+
+    app.innerHTML = '<div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div>';
+
+    fetch(docUrl(code))
+      .then(function (res) {
+        if (res.status === 404) {
+          state('النتيجة غير متاحة',
+            'قد تكون لم تُعتمد بعد. راجع المختبر للتأكد.');
+          return null;
+        }
+        if (!res.ok) throw new Error('http ' + res.status);
+        return res.json();
+      })
+      .then(function (j) {
+        if (!j) return;
+        var raw = j.fields && j.fields.data && j.fields.data.stringValue;
+        if (!raw) throw new Error('empty');
+        render(JSON.parse(raw));
+      })
+      .catch(function () {
+        state('تعذّر فتح النتيجة',
+          'تأكد من اتصالك بالإنترنت ثم أعد المحاولة.', true);
+      });
+  }
+
+  loadBrand();
+  load();
+})();
+</script>
+</body>
+</html>
