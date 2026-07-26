@@ -97,6 +97,24 @@
   .tag.ok{background:#EAF6EF;color:#1E6B45}
 
   /* ── تذييل ── */
+  /* ── نتائج النماذج (بول، براز، مزارع، سائل) ── */
+  .form{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:8px}
+  .form .ftitle{font-weight:800;font-size:15px;margin-bottom:2px}
+  .form .fen{font-size:12px;color:var(--muted);direction:ltr;text-align:right;margin-bottom:8px}
+  .sec{margin-top:12px}
+  .sec .st{font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--rose);margin-bottom:5px}
+  .fr{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .fr:last-child{border-bottom:0}
+  .fr .fl{color:var(--muted);flex:1;min-width:0}
+  .fr .fv{font-weight:700;text-align:left;direction:ltr;white-space:nowrap}
+  .sens{width:100%;border-collapse:collapse;margin-top:4px;font-size:13px}
+  .sens th{font-size:11px;color:var(--muted);font-weight:700;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
+  .sens td{padding:5px 6px;border-bottom:1px dashed var(--line);direction:ltr;text-align:right}
+  .sens td:first-child{text-align:right;direction:rtl}
+  .sir{display:inline-block;min-width:22px;text-align:center;font-weight:800;border-radius:5px;padding:1px 6px;font-size:12px}
+  .sir.S{background:#EAF6EF;color:#1E6B45}
+  .sir.I{background:#FBF3E0;color:var(--low)}
+  .sir.R{background:#FCEAE8;color:var(--high)}
   .note{
     margin-top:24px;background:#fff;border:1px solid var(--line);
     border-right:3px solid var(--gold);border-radius:12px;padding:14px;
@@ -188,6 +206,39 @@
     } catch (e) { return s; }
   }
 
+  function renderForm(r) {
+    var h = '<div class="form"><div class="ftitle">' + esc(r.nameAr || r.title || r.name) + '</div>';
+    if (r.title && r.title !== r.nameAr) h += '<div class="fen">' + esc(r.title) + '</div>';
+    (r.sections || []).forEach(function (sec) {
+      h += '<div class="sec">';
+      if (sec.title) h += '<div class="st">' + esc(sec.title) + '</div>';
+      (sec.fields || []).forEach(function (f) {
+        if (f.type === 'sensitivity') {
+          h += '<table class="sens"><tr><th>المضاد الحيوي</th><th>mm</th><th>النتيجة</th></tr>';
+          f.items.forEach(function (it) {
+            var sir = String(it.sir || '').toUpperCase();
+            h += '<tr><td>' + esc(it.name) + '</td><td class="num">' + esc(it.mm) + '</td><td>' +
+                 (sir ? '<span class="sir ' + (/^[SIR]$/.test(sir) ? sir : '') + '">' + esc(sir) + '</span>' : '—') +
+                 '</td></tr>';
+          });
+          h += '</table>';
+          return;
+        }
+        if (f.type === 'list') {
+          h += '<div class="fr"><span class="fl">' + esc(f.label) + '</span><span class="fv">' +
+               f.items.map(function (i) { return esc(i.name) + ' ' + esc(i.value); }).join(' · ') +
+               '</span></div>';
+          return;
+        }
+        h += '<div class="fr"><span class="fl">' + esc(f.label) + '</span><span class="fv num">' +
+             esc(f.value) + (f.unit ? ' <span style="font-weight:400;color:var(--muted)">' + esc(f.unit) + '</span>' : '') +
+             '</span></div>';
+      });
+      h += '</div>';
+    });
+    return h + '</div>';
+  }
+
   function render(d) {
     var lab = d.lab || {}, p = d.patient || {}, o = d.order || {}, rows = d.rows || [];
     if (lab.name) document.getElementById('labName').textContent = lab.name;
@@ -214,6 +265,7 @@
     order.forEach(function (cat) {
       html += '<div class="cat">' + esc(cat) + '</div>';
       groups[cat].forEach(function (r) {
+        if (r.kind === 'form') { html += renderForm(r); return; }
         var t = TAG[r.flag];
         html += '<div class="row flag-' + esc(r.flag || 'none') + '">';
         html += '<div class="meta"><div class="tname">' + esc(r.nameAr || r.name) + '</div>';
