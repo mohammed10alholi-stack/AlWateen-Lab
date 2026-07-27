@@ -151,6 +151,10 @@
   .savebtn:active{transform:translateY(1px)}
   .savebtn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
   .savehint{text-align:center;font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.6}
+  .sitelink{display:flex;align-items:center;justify-content:center;gap:8px;
+    margin-top:14px;background:#fff;border:1.5px solid var(--line);border-radius:12px;
+    padding:13px;font-size:14.5px;font-weight:700;color:var(--maroon);text-decoration:none}
+  .sitelink svg{flex-shrink:0}
   .savealt{display:none;margin-top:9px;background:#fff;border:1.5px solid var(--maroon);color:var(--maroon);
     border-radius:12px;padding:12px;width:100%;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
   .savewarn{display:none;margin-top:9px;background:#FBF3E0;border:1px solid #E8D6A8;color:#7A5A00;
@@ -349,6 +353,14 @@
     }
     html += '</div>';
     }
+
+    // موقع المختبر — مشتقّ من رابط الصفحة نفسها فيبقى متطابقاً مع أي تغيير للنطاق
+    var site = location.href.split('/r.html')[0] + '/';
+    html += '<a class="sitelink" href="' + esc(site) + '">' +
+            '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>' +
+            '<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>' +
+            ' موقع مختبر الوتين — حجز وأسعار وعروض</a>';
 
     html += '<div class="savebar"><button class="savebtn" id="saveBtn">' +
             '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
