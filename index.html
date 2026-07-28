@@ -1447,7 +1447,17 @@ const TIMES = [
   "20:00"
 ];
 function genCode() {
-  return "LAB-" + Math.floor(1e3 + Math.random() * 9e3);
+  const A = "ACDEFGHJKLMNPQRTUVWXY3479";
+  const n = 10;
+  let out = "";
+  try {
+    const b = new Uint8Array(n);
+    (window.crypto || window.msCrypto).getRandomValues(b);
+    for (let i = 0; i < n; i++) out += A[b[i] % A.length];
+  } catch (e) {
+    for (let i = 0; i < n; i++) out += A[Math.floor(Math.random() * A.length)];
+  }
+  return "LAB-" + out;
 }
 function newTestId() {
   return "t" + Date.now() + Math.floor(Math.random() * 100);
@@ -1991,20 +2001,18 @@ function ResultLookup() {
   const [found, setFound] = useState(void 0);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const digits = (s) => (s || "").replace(/\D/g, "");
+  const cleanCode = (s) => (s || "").toUpperCase().replace(/\s|-/g, "").replace(/^LAB/, "");
   const lookup = async () => {
-    const n = normName(q);
-    const ph = digits(phone);
-    if (n.length < 3 || ph.length < 7) {
-      setErr("اكتب الاسم كاملاً ورقم الجوال المسجّل في الحجز.");
+    const c = cleanCode(q);
+    if (c.length < 4) {
+      setErr("اكتب رمز الحجز كما وصلك عند الحجز.");
       return;
     }
     setErr("");
     setLoading(true);
-    const all = await slist("bookings:");
-    const matches = all.filter((b) => normName(b.name).includes(n) && digits(b.phone) === ph);
-    matches.sort((x, y) => (y.createdAt || "").localeCompare(x.createdAt || ""));
-    setFound(matches);
+    let b = null;
+    try { b = await sget("bookings:LAB-" + c); } catch (e) { b = null; }
+    setFound(b ? [b] : []);
     setLoading(false);
   };
   const cancelBooking = async (b) => {
@@ -2015,13 +2023,10 @@ function ResultLookup() {
     await sset("bookings:" + b.code, __spreadProps(__spreadValues({}, b), { date: ndate, time: ntime }));
     await lookup();
   };
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(Field, { icon: User, label: "اسم المريض" }, /* @__PURE__ */ React.createElement("input", { className: inputCls, value: q, onChange: (e) => {
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(Field, { icon: User, label: "رمز الحجز" }, /* @__PURE__ */ React.createElement("input", { className: inputCls, value: q, dir: "ltr", onChange: (e) => {
     setQ(e.target.value);
     setErr("");
-  }, placeholder: "اكتب اسمك كما هو عند الحجز" })), /* @__PURE__ */ React.createElement(Field, { icon: Phone, label: "رقم الجوال المسجّل" }, /* @__PURE__ */ React.createElement("input", { className: inputCls, value: phone, onChange: (e) => {
-    setPhone(e.target.value);
-    setErr("");
-  }, placeholder: "059xxxxxxx", inputMode: "tel" })), err && /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-sm font-semibold text-red-600" }, err), /* @__PURE__ */ React.createElement(
+  }, placeholder: "LAB-XXXXXXXXXX" })), /* @__PURE__ */ React.createElement("p", { className: "mb-3 -mt-1 text-xs text-slate-500" }, "الرمز وصلك عند تأكيد الحجز. إن فقدته تواصل مع المختبر."), err && /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-sm font-semibold text-red-600" }, err), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: lookup,
@@ -2029,7 +2034,7 @@ function ResultLookup() {
       className: "mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 font-bold text-white hover:bg-teal-700 disabled:opacity-60"
     },
     loading ? "جارٍ البحث..." : "استعلام"
-  ), found && found.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-amber-700" }, "لا يوجد حجز مطابق للاسم ورقم الجوال. تأكد من البيانات كما هي عند الحجز."), found && found.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "space-y-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs text-slate-500" }, "عدد الحجوزات: ", found.length), found.map((b) => /* @__PURE__ */ React.createElement(ResultCard, { key: b.code, b, onCancel: cancelBooking, onReschedule: rescheduleBooking }))));
+  ), found && found.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-amber-700" }, "لا يوجد حجز بهذا الرمز. تأكد من كتابته كما وصلك، أو تواصل مع المختبر."), found && found.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "space-y-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs text-slate-500" }, "عدد الحجوزات: ", found.length), found.map((b) => /* @__PURE__ */ React.createElement(ResultCard, { key: b.code, b, onCancel: cancelBooking, onReschedule: rescheduleBooking }))));
 }
 function InquiryForm() {
   const [name, setName] = useState("");
