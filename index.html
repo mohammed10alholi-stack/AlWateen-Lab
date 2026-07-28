@@ -766,6 +766,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 //# sourceMappingURL=jspdf.umd.min.js.map
 </script>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script>
 (function(){
   try{
@@ -778,6 +779,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       get:function(k){return db.collection("kv").doc(enc(k)).get().then(function(s){return s.exists?{key:k,value:s.data().value}:null;});},
       list:function(p){return db.collection("kv").where("key",">=",p).where("key","<",p+"\uf8ff").get().then(function(snap){return {keys:snap.docs.map(function(d){return d.data().key;})};});},
       delete:function(k){return db.collection("kv").doc(enc(k)).delete().then(function(){return {key:k,deleted:true};});}
+    };
+    // ── دخول الموظفين بحساب المختبر الحقيقي ──
+    // كلمة السر لا تُخزَّن في الصفحة إطلاقاً؛ تُكتب في كل مرة.
+    var LAB_EMAIL = "lab@alwateen.local";
+    window.labAuth = {
+      signIn: function(pass){
+        try {
+          return firebase.auth().signInWithEmailAndPassword(LAB_EMAIL, String(pass||""))
+            .then(function(){ return true; }).catch(function(){ return false; });
+        } catch(e){ return Promise.resolve(false); }
+      },
+      signOut: function(){ try { return firebase.auth().signOut(); } catch(e){ return Promise.resolve(); } }
     };
   }catch(e){
     var el=document.getElementById("err");if(el){el.style.display="block";el.textContent="خطأ في تهيئة قاعدة البيانات:\n"+(e&&e.message?e.message:e);}
@@ -2543,12 +2556,16 @@ function StaffLogin({ onAuth }) {
   const settings = useSettings();
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
-  const submit = () => {
-    if (pin === settings.managerPin) onAuth("manager");
-    else if (pin === settings.doctorPin) onAuth("doctor");
-    else setErr(true);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (busy) return;
+    setErr(false); setBusy(true);
+    let ok = false;
+    try { ok = window.labAuth ? await window.labAuth.signIn(pin) : false; } catch (e) { ok = false; }
+    setBusy(false);
+    if (ok) onAuth("manager"); else setErr(true);
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "mx-auto max-w-xs py-8 text-center" }, /* @__PURE__ */ React.createElement(ShieldCheck, { className: "mx-auto mb-3 h-12 w-12 text-teal-600" }), /* @__PURE__ */ React.createElement("h3", { className: "mb-1 text-lg font-bold text-slate-800" }, "دخول الموظفين"), /* @__PURE__ */ React.createElement("p", { className: "mb-5 text-sm text-slate-500" }, "أدخل الرمز السري الخاص بك"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "mx-auto max-w-xs py-8 text-center" }, /* @__PURE__ */ React.createElement(ShieldCheck, { className: "mx-auto mb-3 h-12 w-12 text-teal-600" }), /* @__PURE__ */ React.createElement("h3", { className: "mb-1 text-lg font-bold text-slate-800" }, "دخول الموظفين"), /* @__PURE__ */ React.createElement("p", { className: "mb-5 text-sm text-slate-500" }, "أدخل كلمة سر حساب المختبر"), /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "password",
@@ -2560,15 +2577,15 @@ function StaffLogin({ onAuth }) {
       onKeyDown: (e) => e.key === "Enter" && submit(),
       className: inputCls + " text-center tracking-widest",
       placeholder: "••••",
-      inputMode: "numeric"
+      autoComplete: "current-password"
     }
-  ), err && /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-sm font-semibold text-red-600" }, "الرمز غير صحيح"), /* @__PURE__ */ React.createElement(
+  ), err && /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-sm font-semibold text-red-600" }, "كلمة السر غير صحيحة أو لا يوجد اتصال"), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: submit,
       className: "mt-4 w-full rounded-xl bg-teal-600 py-3 font-bold text-white hover:bg-teal-700"
     },
-    "دخول"
+    busy ? "جارٍ التحقق..." : "دخول"
   ), /* @__PURE__ */ React.createElement("p", { className: "mt-3 text-center text-xs text-slate-400" }, "للموظفين فقط — أدخل رمز الدخول الخاص بك"));
 }
 function App() {
