@@ -46,7 +46,7 @@
 
   /* ── تذييل ── */
   /* ── نتائج النماذج (بول، براز، مزارع، سائل) ── */
-  .form{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:8px}
+  .form{background:transparent;border:0;border-radius:0;padding:0;margin-bottom:8px}
   .form .ftitle{font-weight:800;font-size:15px;margin-bottom:2px}
   .form .fen{font-size:12px;color:var(--muted);direction:ltr;text-align:right;margin-bottom:8px}
   .sec{margin-top:12px}
@@ -81,16 +81,16 @@
   .foot{margin-top:18px;text-align:center;font-size:12px;color:var(--muted);line-height:1.9}
   .foot a{color:var(--maroon);text-decoration:none;font-weight:700}
   .amend{
-    display:block;text-align:center;margin:0 auto 8px;padding:5px 12px;border-radius:8px;
+    display:table;text-align:center;margin:0 auto 8px;padding:5px 12px;border-radius:8px;
     border:1.5px solid #b45309;background:#FEF3C7;color:#92400E;
     font-size:12px;font-weight:700;
   }
 
   /* ── حالات ── */
   .brandimg{display:block;width:100%;height:auto}
-  #brandTop.has-img .top{display:none}
-  #brandTop .top{padding:14px 12mm 12px}
-  #brandBottom{margin-top:auto}
+  .brandTop.has-img .top{display:none}
+  .brandTop .top{padding:14px 12mm 12px}
+  .brandBottom{margin-top:auto}
   /* ── زر حفظ النتيجة ── */
   .savebar{position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,rgba(251,248,246,0) 0%,var(--paper) 45%)}
@@ -117,7 +117,10 @@
     /* ما لا يخصّ الورقة لا يُطبع */
     .savebar,.savehint,.savealt,.savewarn,.sitelink,.note,.zoombar,.foot{display:none !important}
     #stage{overflow:visible}
-    #page{transform:none !important;width:210mm;min-height:297mm;box-shadow:none}
+    #pages{transform:none !important;width:210mm}
+    .page{width:210mm;min-height:297mm;box-shadow:none;break-after:page;page-break-after:always}
+    .page:last-child{break-after:auto;page-break-after:auto}
+    .page + .page{margin-top:0}
     .wrap{max-width:none;padding:0;margin:0}
     .sheet{box-shadow:none;border-radius:0;padding:0;margin:0}
     .brandimg{width:100%;height:auto;display:block}
@@ -152,12 +155,13 @@
    المحتوى مبني بعرض 210mm بالضبط، وبنصغّره بصرياً ليناسب الشاشة —
    فالنِسَب وأحجام الخطوط والهوامش تطابق الورقة تماماً. */
 #stage{overflow:hidden;display:flex;justify-content:center}
-#page{
-  width:210mm;min-height:297mm;flex:none;background:#fff;
-  transform-origin:top center;
+#pages{width:210mm;flex:none;transform-origin:top center}
+.page{
+  width:210mm;min-height:297mm;background:#fff;
   box-shadow:0 2px 14px rgba(17,24,39,.13);
-  display:flex;flex-direction:column;
+  display:flex;flex-direction:column;overflow:hidden;
 }
+.page + .page{margin-top:6mm}
 /* هامش المحتوى — نفس PAGE_PAD بالبرنامج */
 .pbody{flex:1;padding:0 12mm;display:flex;flex-direction:column}
 /* شريط التكبير */
@@ -188,37 +192,23 @@ table.res .v{font-weight:700;text-align:center;white-space:nowrap;
 table.res .u{color:#4b5563;text-align:center;white-space:nowrap}
 table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
   white-space:normal;overflow-wrap:break-word}
-.sig{display:flex;justify-content:flex-end;margin:20px 6px 10px}
-.sig div{border-top:1px solid #9ca3af;padding-top:4px;font-size:11.5px;color:#6b7280;min-width:230px;text-align:center}
-@media(max-width:430px){
-  .sheet{padding:12px 10px 8px}
-  .pbox{grid-template-columns:1fr;padding:7px 12px}
-  table.res{font-size:11.5px}
-  table.res th,table.res td{padding:5px 5px}
-}
+.sheet{flex:1;display:flex;flex-direction:column}
+.sheet>table.res,.sheet>.form,.sheet>.reftbl{flex:none}
+/* يُدفع لأسفل الورقة بالمساحة الفاضية — نفس سلوك flex:1 في Print.jsx */
+.sig{display:flex;direction:rtl;justify-content:flex-start;margin:20px 6px 10px;margin-top:auto}
+.sig div{border-top:1px solid #9ca3af;padding-top:4px;font-size:11.5px;color:#6b7280;min-width:230px;text-align:center;padding-bottom:2px}
+.sig .stampspace{height:26px}
+/* لا استعلامات شاشة على الورقة: عرضها 210mm دائماً مهما كان الجهاز،
+   والتصغير يتكفّل بالملاءمة — تماماً كورقة مطبوعة. */
 </style>
 </head>
 <body>
 
-<div id="stage">
-  <div id="page">
-
-    <div id="brandTop">
-      <div class="top" id="fallbackTop">
-        <h1 id="labName">مختبر الوتين الطبي</h1>
-        <div class="sub">تقرير نتائج مخبرية</div>
-        <div class="rule"></div>
-      </div>
-    </div>
-
-    <div class="pbody"><div id="app">
-      <div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div>
-    </div></div>
-
-    <div id="brandBottom"></div>
-
-  </div>
-</div>
+<div id="stage"><div id="pages">
+  <div class="page"><div class="pbody">
+    <div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div>
+  </div></div>
+</div></div>
 
 <div class="wrap"><div id="extras"></div></div>
 
@@ -226,7 +216,6 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
 (function () {
   var PROJECT = 'alwateen-lab';
   var KEY = 'AIzaSyDJYzJ9q71xKGIPMD2t7URFEEzLa3gb1_E';
-  var app = document.getElementById('app');
 
   var BHCG_ROWS = [
     ['Non-pregnant','<5'],['2-3 weeks','5-50'],['4 weeks','40-1,000'],['5 weeks','404-20,700'],
@@ -246,19 +235,20 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     abnormal:      ['غير طبيعي', 'hi']
   };
 
-  var page = document.getElementById('page');
+  var pagesEl = document.getElementById('pages');
   var stage = document.getElementById('stage');
   var extras = document.getElementById('extras');
   var zoomFull = false;
+  var lastData = null;
 
   /* الورقة مبنية بعرض 210mm ثابت — نصغّرها بصرياً لتناسب الشاشة.
      التحويل لا يغيّر ارتفاع المكان المحجوز، فنضبطه يدوياً. */
   function fitPage() {
-    var pw = page.offsetWidth || 794;
+    var pw = pagesEl.offsetWidth || 794;
     var avail = document.documentElement.clientWidth - 16;
     var sc = zoomFull ? 1 : Math.min(1, avail / pw);
-    page.style.transform = 'scale(' + sc + ')';
-    stage.style.height = (page.offsetHeight * sc) + 'px';
+    pagesEl.style.transform = 'scale(' + sc + ')';
+    stage.style.height = (pagesEl.offsetHeight * sc) + 'px';
     stage.style.overflowX = sc === 1 ? 'auto' : 'hidden';
   }
   window.addEventListener('resize', fitPage);
@@ -270,10 +260,35 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
   }
 
   function state(title, body, showRetry) {
-    app.innerHTML = '<div class="state"><h2>' + esc(title) + '</h2><p>' + body + '</p>' +
-      (showRetry ? '<button class="retry" id="rt">حاول مرة أخرى</button>' : '') + '</div>';
+    pagesEl.innerHTML = '<div class="page"><div class="pbody"><div class="state"><h2>' +
+      esc(title) + '</h2><p>' + body + '</p>' +
+      (showRetry ? '<button class="retry" id="rt">حاول مرة أخرى</button>' : '') + '</div></div></div>';
+    fitPage();
     var b = document.getElementById('rt');
     if (b) b.onclick = load;
+  }
+
+  // ── الترويسة والذيل يتكرّران على كل صفحة، تماماً كالمطبوع ──
+  function brandTopHtml() {
+    var b = window.__brand;
+    if (b && b.headerImg) {
+      return '<div class="brandTop has-img"><img class="brandimg" alt="" src="' + b.headerImg + '"></div>';
+    }
+    var nm = (b && b.name) || 'مختبر الوتين الطبي';
+    return '<div class="brandTop"><div class="top"><h1>' + esc(nm) + '</h1>' +
+           '<div class="sub">تقرير نتائج مخبرية</div><div class="rule"></div></div></div>';
+  }
+  function brandBottomHtml() {
+    var b = window.__brand;
+    return '<div class="brandBottom">' +
+      (b && b.footerImg ? '<img class="brandimg" alt="" src="' + b.footerImg + '">' : '') + '</div>';
+  }
+  /** يلفّ محتوى صفحة واحدة بترويسة وذيل وتوقيع */
+  function pageShell(head, inner) {
+    return '<div class="page">' + brandTopHtml() +
+           '<div class="pbody"><div class="sheet">' + head + inner +
+           '<div class="sig"><div><div class="stampspace"></div>التوقيع والختم</div></div>' +
+           '</div></div>' + brandBottomHtml() + '</div>';
   }
 
   function fmtDate(s) {
@@ -322,9 +337,10 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
 
   function render(d) {
     var lab = d.lab || {}, p = d.patient || {}, o = d.order || {}, rows = d.rows || [];
-    if (lab.name) document.getElementById('labName').textContent = lab.name;
+    if (lab.name && window.__brand) window.__brand.name = lab.name;
 
-    var html = '<div class="sheet">';
+    lastData = d;
+    var html = '';
     html += '<div class="hrule"></div>';
     html += '<div class="rtitle">Lab Report</div>';
 
@@ -343,6 +359,9 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     html += '<div><b>Order No.:</b> ' + esc(o.code || '—') + '</div>';
     html += '<div><b>Doctor:</b> ' + esc(o.doctor || '—') + '</div>';
     html += '</div>';
+
+    var head = html;   // يتكرّر أعلى كل صفحة، زي ReportPageInner
+    html = '';
 
     // تجميع حسب الفئة مع الحفاظ على ترتيب ورودها
     var order = [], groups = {};
@@ -377,8 +396,6 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
       html += '</tbody></table>';
     }
 
-    forms.forEach(function (r) { html += renderForm(r); });
-
     var hasHcg = rows.some(function (r) {
       return r.code === 'BHCG' || /hcg/i.test(String(r.name || '') + String(r.nameAr || ''));
     });
@@ -390,10 +407,13 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
       html += '</table></div>';
     }
 
-    html += '<div class="sig"><div>التوقيع والختم</div></div>';
-    html += '</div>';   // إغلاق الورقة
+    // ── الصفحات: الجدول العادي صفحة، وكل نموذج (بول/براز/مزرعة) صفحة لحاله ──
+    var sheets = [];
+    if (html.trim() !== '') sheets.push(html);
+    forms.forEach(function (r) { sheets.push(renderForm(r)); });
+    if (!sheets.length) sheets.push('<div style="text-align:center;color:#9ca3af;padding:30px">لا توجد نتائج بعد</div>');
 
-    app.innerHTML = html;   // الورقة وحدها جوّا A4
+    pagesEl.innerHTML = sheets.map(function (inner) { return pageShell(head, inner); }).join('');
     html = '';
 
     // شريط التكبير — ملء العرض أو الحجم الطبيعي
@@ -478,17 +498,9 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
 
   function paintBrand(b) {
     if (!b) return;
-    if (b.name) { var el = document.getElementById('labName'); if (el) el.textContent = b.name; }
-    if (b.headerImg) {
-      var t = document.getElementById('brandTop');
-      t.classList.add('has-img');
-      t.insertAdjacentHTML('afterbegin', '<img class="brandimg" alt="" src="' + b.headerImg + '">');
-    }
-    if (b.footerImg) {
-      document.getElementById('brandBottom').innerHTML =
-        '<img class="brandimg" alt="" src="' + b.footerImg + '">';
-    }
     window.__brand = b;
+    // الترويسة تدخل في بناء كل صفحة، فنعيد الرسم إن كانت النتيجة ظاهرة
+    if (lastData) render(lastData);
     // صور الترويسة تُغيّر ارتفاع الورقة بعد تحميلها
     Array.prototype.forEach.call(document.querySelectorAll('.brandimg'), function (im) {
       if (im.complete) fitPage(); else im.onload = fitPage;
@@ -527,7 +539,8 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
       return;
     }
 
-    app.innerHTML = '<div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div>';
+    pagesEl.innerHTML = '<div class="page"><div class="pbody"><div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div></div></div>';
+    fitPage();
 
     fetch(docUrl(code))
       .then(function (res) {
