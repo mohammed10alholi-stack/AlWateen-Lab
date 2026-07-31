@@ -137,7 +137,7 @@
     #pages{transform:none !important;width:210mm !important;margin:0 !important}
     /* ورقة واحدة على الشاشة = ورقة واحدة بالطباعة، بالضبط.
        الارتفاع 296mm (لا 297) بهامش أمان حتى لا تنزلق سطر لصفحة ثانية. */
-    .page{width:210mm !important;height:296mm !important;min-height:0 !important;
+    .page{width:210mm !important;height:297mm !important;min-height:0 !important;
           box-shadow:none !important;overflow:hidden !important;
           break-after:page;page-break-after:always;break-inside:avoid}
     .page:last-child{break-after:auto;page-break-after:auto}
@@ -179,10 +179,12 @@
 #pages{align-self:flex-start}
 #pages{width:210mm;flex:none;transform-origin:top center}
 .page{
-  width:210mm;min-height:297mm;background:#fff;
+  width:210mm;height:297mm;background:#fff;
   box-shadow:0 2px 14px rgba(17,24,39,.13);
   display:flex;flex-direction:column;overflow:hidden;
 }
+.pbody{min-height:0}
+.sheet{min-height:0}
 .page + .page{margin-top:6mm}
 /* هامش المحتوى — نفس PAGE_PAD بالبرنامج */
 .pbody{flex:1;padding:0 12mm;display:flex;flex-direction:column}
@@ -265,6 +267,33 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
 
   /* الورقة مبنية بعرض 210mm ثابت — نصغّرها بصرياً لتناسب الشاشة.
      التحويل لا يغيّر ارتفاع المكان المحجوز، فنضبطه يدوياً. */
+  /* لا يخرج المحتوى خارج الورقة أبداً: إن زاد (مثلاً مضادات أكثر)
+     نصغّره تدريجياً بـ zoom — و zoom يغيّر التخطيط فعلاً، فيسري
+     على الشاشة والطباعة معاً ويبقى عدد الصفحات واحداً في الاثنين. */
+  function fitContent() {
+    Array.prototype.forEach.call(document.querySelectorAll('.page .sheet'), function (sh) {
+      sh.style.zoom = '';
+      var z = 1;
+      for (var i = 0; i < 8; i++) {
+        var need = sh.scrollHeight, have = sh.clientHeight;
+        if (need <= have + 1) break;
+        z = z * (have / need) * 0.995;
+        if (z < 0.42) { z = 0.42; sh.style.zoom = z; break; }
+        sh.style.zoom = z;
+      }
+    });
+  }
+
+  /* التخطيط لا يستقرّ فوراً (صور الترويسة، الخطوط)، فنعيد القياس
+     بعد إطار الرسم وبعد مهلة قصيرة وإلا بقي فائض بسيط بلا تصغير. */
+  function refit() {
+    fitContent(); fitPage();
+    requestAnimationFrame(function () { fitContent(); fitPage(); });
+    setTimeout(function () { fitContent(); fitPage(); }, 120);
+    setTimeout(function () { fitContent(); fitPage(); }, 500);
+  }
+  window.addEventListener('load', refit);
+
   function fitPage() {
     var pw = pagesEl.offsetWidth || 794;
     var avail = document.documentElement.clientWidth - 16;
@@ -521,7 +550,7 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
             'افتحها في <b>سفاري</b> أو <b>كروم</b> — اضغط أيقونة المشاركة أو الثلاث نقاط ثم «فتح في المتصفح»، وأعد المحاولة.</div></div>';
 
     extras.innerHTML = html;
-    fitPage();
+    refit();
 
     var zf = document.getElementById('zFit'), zu = document.getElementById('zFull');
     function setZoom(full) {
@@ -568,9 +597,9 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     if (lastData) render(lastData);
     // صور الترويسة تُغيّر ارتفاع الورقة بعد تحميلها
     Array.prototype.forEach.call(document.querySelectorAll('.brandimg'), function (im) {
-      if (im.complete) fitPage(); else im.onload = fitPage;
+      if (im.complete) refit(); else im.onload = refit;
     });
-    fitPage();
+    refit();
   }
 
   function loadBrand() {
