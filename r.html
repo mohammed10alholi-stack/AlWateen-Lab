@@ -130,18 +130,18 @@
     body{background:#fff;font-size:11pt}
     /* ما لا يخصّ الورقة لا يُطبع */
     .savebar,.savehint,.savealt,.savewarn,.sitelink,.note,.zoombar,.foot{display:none !important}
-    /* JS يضبط ارتفاع #stage وتصغير #pages للعرض على الشاشة —
-       لازم نلغيهما بالطباعة وإلا قُصّت الورقة (المشكلة الي ظهرت بالحفظ PDF). */
-    #stage{overflow:visible !important;height:auto !important;display:block}
-    #pages{transform:none !important;width:100% !important;margin:0 !important}
-    /* عرض 100% بدل 210mm ثابت: بعض المتصفحات (سفاري بالجوال) تفرض
-       هوامش طباعة خاصة بها، فالعرض الثابت يفيض ويُقصّ من الجنب. */
-    .page{width:100% !important;min-height:0 !important;box-shadow:none !important;
-          overflow:visible !important;break-after:page;page-break-after:always}
+    /* JS يضبط ارتفاع #stage وتصغير #pages للعرض على الشاشة.
+       #stage كان flex متمركز و overflow:hidden، فالورقة (794px) داخل شاشة
+       أضيق كانت تفيض من الجهتين وتُقصّ — هذا سبب القصّ من الشمال. */
+    #stage{display:block !important;overflow:visible !important;height:auto !important}
+    #pages{transform:none !important;width:210mm !important;margin:0 !important}
+    /* ورقة واحدة على الشاشة = ورقة واحدة بالطباعة، بالضبط.
+       الارتفاع 296mm (لا 297) بهامش أمان حتى لا تنزلق سطر لصفحة ثانية. */
+    .page{width:210mm !important;height:296mm !important;min-height:0 !important;
+          box-shadow:none !important;overflow:hidden !important;
+          break-after:page;page-break-after:always;break-inside:avoid}
     .page:last-child{break-after:auto;page-break-after:auto}
-    .page + .page{margin-top:0}
-    .brandBottom{margin-top:12px}
-    .sig{margin-top:20px !important}
+    .page + .page{margin-top:0 !important}
     .wrap{max-width:none;padding:0;margin:0}
     .sheet{box-shadow:none;border-radius:0;padding:0;margin:0}
     .brandimg{width:100%;height:auto;display:block}
