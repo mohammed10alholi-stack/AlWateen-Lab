@@ -133,8 +133,9 @@
   .foot{margin-top:18px;text-align:center;font-size:12px;color:var(--muted);line-height:1.9}
   .foot a{color:var(--maroon);text-decoration:none;font-weight:700}
   .amend{
-    background:#FBF3E0;border:1px solid #E8D6A8;color:#7A5A00;
-    border-radius:10px;padding:10px 12px;font-size:13px;margin-top:14px;font-weight:600;
+    display:block;text-align:center;margin:0 auto 8px;padding:5px 12px;border-radius:8px;
+    border:1.5px solid #b45309;background:#FEF3C7;color:#92400E;
+    font-size:12px;font-weight:700;
   }
 
   /* ── حالات ── */
@@ -196,25 +197,37 @@
   }
   .retry:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 
-/* ورقة التقرير — بنفس تخطيط النسخة المطبوعة */
-.sheet{background:#fff;border-radius:14px;padding:18px 16px 10px;box-shadow:0 1px 3px rgba(17,24,39,.06)}
-.rtitle{text-align:center;font-weight:800;color:#472069;font-size:15px;margin:6px 0 8px}
-.pbox{background:#faf7fb;border-radius:10px;padding:9px 12px;font-size:12.5px;
-  display:grid;grid-template-columns:1fr 1fr;gap:3px 18px;direction:ltr;text-align:left;margin-bottom:10px}
+/* ورقة التقرير — مطابِقة لتخطيط Print.jsx (نفس الألوان والحدود والحشو) */
+.sheet{background:#fff;border-radius:14px;padding:14px 16px 10px;box-shadow:0 1px 3px rgba(17,24,39,.06)}
+/* خط الترويسة المتدرّج — نفس الي فوق جملة Lab Report بالورقة */
+.hrule{height:2.5px;border-radius:2px;margin:4px 0 2px;
+  background:linear-gradient(90deg,#7A1F3D,#C9A227)}
+.rtitle{text-align:center;font-weight:700;color:#472069;font-size:15px;margin:3px 0}
+.pbox{background:#faf7fb;border-radius:10px;padding:5px 16px;font-size:12.5px;
+  display:grid;grid-template-columns:1fr 1fr;gap:3px 28px;direction:ltr;text-align:left;margin-bottom:6px}
 .pbox b{color:#7A1F3D}
-table.res{width:100%;border-collapse:collapse;direction:ltr;text-align:left;font-size:12.5px}
-table.res th{background:#EFE7F2;color:#3B1656;font-weight:800;padding:6px 8px;text-align:left;font-size:12px}
-table.res td{padding:6px 8px;border-bottom:1px solid #F0EAF2;vertical-align:top}
-table.res tr.cat td{background:#F7F2F8;font-weight:800;color:#5B2A86;padding:5px 8px}
-table.res .tn{font-weight:600;color:#111827}
-table.res .tn small{color:#9CA3AF;font-weight:500}
-table.res .v{font-weight:800;text-align:center;white-space:nowrap}
-table.res .v.hi{background:#FDF07A;border-radius:3px}
-table.res .u{color:#4B5563;text-align:center;white-space:nowrap}
-table.res .rf{color:#4B5563;line-height:1.45}
-.sig{display:flex;justify-content:flex-end;margin:22px 6px 4px}
-.sig div{border-top:1px solid #9ca3af;padding-top:4px;font-size:11.5px;color:#6b7280;min-width:190px;text-align:center}
-@media(max-width:420px){ .pbox{grid-template-columns:1fr} table.res{font-size:11.5px} }
+table.res{width:100%;border-collapse:collapse;direction:ltr;text-align:left;font-size:13px}
+table.res th{background:#E3CFE3;color:#3B1656;font-weight:700;padding:7px 8px;
+  text-align:left;border:1px solid #d9c4d9}
+table.res th.c{text-align:center}
+table.res td{padding:7px 8px;border:1px solid #eee;vertical-align:top;text-align:left}
+table.res tr.cat td{background:#F3EAF3;font-weight:700;color:#5B2A86;padding:5px 10px;
+  border:1px solid #d9c4d9;letter-spacing:.3px;font-size:12.5px}
+table.res .tn{color:#111827}
+table.res .tn small{color:#6b7280;font-size:11px}
+table.res .v{font-weight:700;text-align:center;white-space:nowrap;
+  background:#FEF9C3;color:#0B1020}
+table.res .u{color:#4b5563;text-align:center;white-space:nowrap}
+table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
+  white-space:normal;overflow-wrap:break-word}
+.sig{display:flex;justify-content:flex-end;margin:20px 6px 10px}
+.sig div{border-top:1px solid #9ca3af;padding-top:4px;font-size:11.5px;color:#6b7280;min-width:230px;text-align:center}
+@media(max-width:430px){
+  .sheet{padding:12px 10px 8px}
+  .pbox{grid-template-columns:1fr;padding:7px 12px}
+  table.res{font-size:11.5px}
+  table.res th,table.res td{padding:5px 5px}
+}
 </style>
 </head>
 <body>
@@ -321,20 +334,24 @@ table.res .rf{color:#4B5563;line-height:1.45}
     if (lab.name) document.getElementById('labName').textContent = lab.name;
 
     var html = '<div class="sheet">';
+    html += '<div class="hrule"></div>';
     html += '<div class="rtitle">Lab Report</div>';
 
+    if (o.amended > 0) {
+      html += '<div class="amend">تقرير مُعدَّل — AMENDED REPORT</div>';
+    }
+
+    // نفس حقول PatientBox بالورقة وبنفس الترتيب
+    var gmap = { F: 'Female', C: 'Child' };
     html += '<div class="pbox">';
     html += '<div><b>Patient:</b> ' + esc(p.name || '—') + '</div>';
     html += '<div><b>Patient ID:</b> ' + esc(p.code || '—') + '</div>';
-    html += '<div><b>Gender:</b> ' + (p.gender === 'F' ? 'Female' : 'Male') + '</div>';
+    html += '<div><b>Gender:</b> ' + (gmap[p.gender] || 'Male') + '</div>';
     html += '<div><b>Age:</b> ' + esc(p.ageText || '—') + '</div>';
     html += '<div><b>Date:</b> ' + esc(fmtDate(o.date)) + '</div>';
     html += '<div><b>Order No.:</b> ' + esc(o.code || '—') + '</div>';
+    html += '<div><b>Doctor:</b> ' + esc(o.doctor || '—') + '</div>';
     html += '</div>';
-
-    if (o.amended > 0) {
-      html += '<div class="amend">هذا التقرير مُعدَّل — اعتمد على هذه النسخة وتجاهل أي نسخة أقدم.</div>';
-    }
 
     // تجميع حسب الفئة مع الحفاظ على ترتيب ورودها
     var order = [], groups = {};
@@ -353,16 +370,15 @@ table.res .rf{color:#4B5563;line-height:1.45}
 
     if (simple.length) {
       html += '<table class="res"><thead><tr>' +
-              '<th style="width:38%">Test</th><th style="width:16%;text-align:center">Result</th>' +
-              '<th style="width:14%;text-align:center">Unit</th><th>Reference</th></tr></thead><tbody>';
+              '<th style="width:38%">Test</th><th class="c" style="width:16%">Result</th>' +
+              '<th class="c" style="width:14%">Unit</th><th>Reference</th></tr></thead><tbody>';
       simple.forEach(function (g) {
         html += '<tr class="cat"><td colspan="4">' + esc(g[0]) + '</td></tr>';
         g[1].forEach(function (r) {
-          var abn = r.flag && r.flag !== 'none';
           html += '<tr><td class="tn">' + esc(r.name || r.nameAr);
           if (r.nameAr && r.name && r.nameAr !== r.name) html += ' <small>(' + esc(r.nameAr) + ')</small>';
           html += '</td>';
-          html += '<td class="v"><span class="' + (abn ? 'v hi' : '') + '">' + esc(r.value || '—') + '</span></td>';
+          html += '<td class="v">' + esc(r.value || '—') + '</td>';
           html += '<td class="u">' + esc(r.unit || '') + '</td>';
           html += '<td class="rf">' + esc(r.reference || '') + '</td></tr>';
         });
