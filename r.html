@@ -89,7 +89,8 @@
   /* ── حالات ── */
   .brandimg{display:block;width:100%;height:auto}
   #brandTop.has-img .top{display:none}
-  #brandBottom{margin-top:26px}
+  #brandTop .top{padding:14px 12mm 12px}
+  #brandBottom{margin-top:auto}
   /* ── زر حفظ النتيجة ── */
   .savebar{position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,rgba(251,248,246,0) 0%,var(--paper) 45%)}
@@ -110,11 +111,13 @@
     border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.7;text-align:right}
 
   @media print{
-    @page{ size:A4; margin:10mm }
+    @page{ size:A4; margin:0 }
     *{ -webkit-print-color-adjust:exact; print-color-adjust:exact }
     body{background:#fff;font-size:11pt}
     /* ما لا يخصّ الورقة لا يُطبع */
-    .savebar,.savehint,.savealt,.savewarn,.sitelink,.note{display:none !important}
+    .savebar,.savehint,.savealt,.savewarn,.sitelink,.note,.zoombar,.foot{display:none !important}
+    #stage{overflow:visible}
+    #page{transform:none !important;width:210mm;min-height:297mm;box-shadow:none}
     .wrap{max-width:none;padding:0;margin:0}
     .sheet{box-shadow:none;border-radius:0;padding:0;margin:0}
     .brandimg{width:100%;height:auto;display:block}
@@ -145,8 +148,25 @@
   }
   .retry:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 
-/* ورقة التقرير — مطابِقة لتخطيط Print.jsx (نفس الألوان والحدود والحشو) */
-.sheet{background:#fff;border-radius:14px;padding:14px 16px 10px;box-shadow:0 1px 3px rgba(17,24,39,.06)}
+/* ═══ ورقة A4 حقيقية: 210×297mm بنفس أبعاد النسخة المطبوعة ═══
+   المحتوى مبني بعرض 210mm بالضبط، وبنصغّره بصرياً ليناسب الشاشة —
+   فالنِسَب وأحجام الخطوط والهوامش تطابق الورقة تماماً. */
+#stage{overflow:hidden;display:flex;justify-content:center}
+#page{
+  width:210mm;min-height:297mm;flex:none;background:#fff;
+  transform-origin:top center;
+  box-shadow:0 2px 14px rgba(17,24,39,.13);
+  display:flex;flex-direction:column;
+}
+/* هامش المحتوى — نفس PAGE_PAD بالبرنامج */
+.pbody{flex:1;padding:0 12mm;display:flex;flex-direction:column}
+/* شريط التكبير */
+.zoombar{display:flex;gap:8px;justify-content:center;align-items:center;margin:10px 0 4px}
+.zoombtn{background:#fff;border:1.5px solid var(--line);color:var(--maroon);
+  border-radius:10px;padding:7px 14px;font-size:13px;font-weight:700;
+  font-family:inherit;cursor:pointer}
+.zoombtn.on{background:var(--maroon);border-color:var(--maroon);color:#fff}
+.sheet{background:transparent;padding:0}
 /* خط الترويسة المتدرّج — نفس الي فوق جملة Lab Report بالورقة */
 .hrule{height:2.5px;border-radius:2px;margin:4px 0 2px;
   background:linear-gradient(90deg,#7A1F3D,#C9A227)}
@@ -180,21 +200,27 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
 </head>
 <body>
 
-<div id="brandTop">
-  <div class="top" id="fallbackTop">
-    <div class="wrap" style="padding-bottom:0">
-      <h1 id="labName">مختبر الوتين الطبي</h1>
-      <div class="sub">تقرير نتائج مخبرية</div>
-      <div class="rule"></div>
+<div id="stage">
+  <div id="page">
+
+    <div id="brandTop">
+      <div class="top" id="fallbackTop">
+        <h1 id="labName">مختبر الوتين الطبي</h1>
+        <div class="sub">تقرير نتائج مخبرية</div>
+        <div class="rule"></div>
+      </div>
     </div>
+
+    <div class="pbody"><div id="app">
+      <div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div>
+    </div></div>
+
+    <div id="brandBottom"></div>
+
   </div>
 </div>
 
-<div class="wrap"><div id="app">
-  <div class="state"><div class="spin"></div><p>جارٍ فتح النتيجة…</p></div>
-</div></div>
-
-<div id="brandBottom"></div>
+<div class="wrap"><div id="extras"></div></div>
 
 <script>
 (function () {
@@ -219,6 +245,23 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     critical_low:  ['حرج منخفض', 'crit'],
     abnormal:      ['غير طبيعي', 'hi']
   };
+
+  var page = document.getElementById('page');
+  var stage = document.getElementById('stage');
+  var extras = document.getElementById('extras');
+  var zoomFull = false;
+
+  /* الورقة مبنية بعرض 210mm ثابت — نصغّرها بصرياً لتناسب الشاشة.
+     التحويل لا يغيّر ارتفاع المكان المحجوز، فنضبطه يدوياً. */
+  function fitPage() {
+    var pw = page.offsetWidth || 794;
+    var avail = document.documentElement.clientWidth - 16;
+    var sc = zoomFull ? 1 : Math.min(1, avail / pw);
+    page.style.transform = 'scale(' + sc + ')';
+    stage.style.height = (page.offsetHeight * sc) + 'px';
+    stage.style.overflowX = sc === 1 ? 'auto' : 'hidden';
+  }
+  window.addEventListener('resize', fitPage);
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -350,6 +393,14 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     html += '<div class="sig"><div>التوقيع والختم</div></div>';
     html += '</div>';   // إغلاق الورقة
 
+    app.innerHTML = html;   // الورقة وحدها جوّا A4
+    html = '';
+
+    // شريط التكبير — ملء العرض أو الحجم الطبيعي
+    html += '<div class="zoombar">' +
+            '<button class="zoombtn on" id="zFit">ملء الشاشة</button>' +
+            '<button class="zoombtn" id="zFull">الحجم الطبيعي</button></div>';
+
     html += '<div class="note">هذه النتيجة للاطلاع. القراءة النهائية وربطها بحالتك الصحية عند طبيبك — ' +
             'لا تبدأ أو توقف أي علاج بناءً على هذه الصفحة وحدها.</div>';
 
@@ -384,7 +435,18 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
             '<div class="savewarn" id="saveWarn">هذه الصفحة مفتوحة داخل تطبيق آخر، والحفظ لا يعمل هنا.<br>' +
             'افتحها في <b>سفاري</b> أو <b>كروم</b> — اضغط أيقونة المشاركة أو الثلاث نقاط ثم «فتح في المتصفح»، وأعد المحاولة.</div></div>';
 
-    app.innerHTML = html;
+    extras.innerHTML = html;
+    fitPage();
+
+    var zf = document.getElementById('zFit'), zu = document.getElementById('zFull');
+    function setZoom(full) {
+      zoomFull = full;
+      zf.classList.toggle('on', !full);
+      zu.classList.toggle('on', full);
+      fitPage();
+    }
+    if (zf) zf.onclick = function () { setZoom(false); };
+    if (zu) zu.onclick = function () { setZoom(true); };
 
     var sb = document.getElementById('saveBtn');
     var warn = document.getElementById('saveWarn');
@@ -427,6 +489,11 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
         '<img class="brandimg" alt="" src="' + b.footerImg + '">';
     }
     window.__brand = b;
+    // صور الترويسة تُغيّر ارتفاع الورقة بعد تحميلها
+    Array.prototype.forEach.call(document.querySelectorAll('.brandimg'), function (im) {
+      if (im.complete) fitPage(); else im.onload = fitPage;
+    });
+    fitPage();
   }
 
   function loadBrand() {
