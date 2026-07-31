@@ -62,19 +62,25 @@
   .fr.stack{display:block}
   .fr.stack .fv{display:block;font-weight:700;overflow-wrap:anywhere;line-height:1.6}
 
-  /* ── الحساسية للمضادات ── */
+  /* ── الحساسية للمضادات — نفس صفحة المزرعة بالمطبوع ── */
   .sec .st.sens-t{font-size:13px;padding:3px 8px;margin:2px 0 4px}
-  .sirkey{display:flex;gap:12px;justify-content:center;font-size:10px;margin-bottom:5px}
+  .sirkey{display:flex;gap:14px;justify-content:flex-end;font-size:9.5px;margin-bottom:5px;direction:ltr}
   .sirkey b{font-weight:800}
-  .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
-  .srow{display:flex;align-items:center;gap:6px;font-size:11.5px;
-    padding:2px 6px;margin-bottom:2px;border-radius:4px}
-  .srow .sn{color:#111827;font-weight:600;flex:1}
-  .srow .smm{color:#374151;font-size:10.5px;font-weight:700}
-  .srow b{white-space:nowrap}
-  .srow.S{background:#FDF2F2} .srow.S b{color:#C81E1E}
-  .srow.R{background:#F2F3F5} .srow.R b{color:#111827}
-  .srow.I{background:#EFF4FF} .srow.I b{color:#1D4ED8}
+  /* عمودان متوازنان من عائلات المضادات */
+  .fams{column-count:2;column-gap:16px;direction:ltr}
+  .fam{break-inside:avoid;page-break-inside:avoid;margin-bottom:7px}
+  .fam .fh{font-weight:800;font-size:11px;color:#7A1F3D;background:#F7EEF2;
+    padding:2px 8px;border-left:3px solid #C9A227;border-radius:3px;margin-bottom:2px}
+  .fam table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:10.5px}
+  .fam td{padding:2px 5px;border-bottom:1px solid #fff;vertical-align:top;overflow-wrap:anywhere}
+  .fam td.ab{font-weight:600;color:#111827;line-height:1.22;width:50%}
+  .fam td.ab small{display:block;color:#4B5563;font-size:9px;font-weight:700}
+  .fam td.mm{text-align:center;font-weight:700;width:22%}
+  .fam td.sir{text-align:center;font-weight:800;width:28%}
+  .fam tr.S{background:#FDF2F2} .fam tr.S td.sir{color:#C81E1E}
+  .fam tr.R{background:#F2F3F5} .fam tr.R td.sir{color:#111827}
+  .fam tr.I{background:#EFF4FF} .fam tr.I td.sir{color:#1D4ED8}
+  .fam tr.none td.sir{color:#9ca3af}
   .reftbl{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
   .reftbl .rt{font-weight:800;font-size:13px;color:var(--maroon);text-align:center;margin-bottom:8px;line-height:1.4}
   .reftbl table{width:100%;border-collapse:collapse;font-size:13px}
@@ -331,13 +337,29 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
              '<b style="color:#C81E1E">\u25a0 S = Sensitive</b>' +
              '<b style="color:#1D4ED8">\u25a0 I = Intermediate</b>' +
              '<b style="color:#111827">\u25a0 R = Resistant</b></div>';
-        h += '<div class="sgrid">';
+
+        // تجميع حسب العائلة مع الحفاظ على ترتيب ورودها من البرنامج
+        var famOrder = [], famMap = {};
         (sens.items || []).forEach(function (it) {
-          var v = String(it.sir || '').toUpperCase();
-          if (!/^[SIR]$/.test(v)) v = 'I';
-          h += '<div class="srow ' + v + '"><span class="sn">' + esc(it.name) +
-               (it.mm ? ' <span class="smm">(' + esc(it.mm) + ' mm)</span>' : '') +
-               '</span><b>' + SIRLABEL[v] + '</b></div>';
+          var fam = it.family || 'Others';
+          if (!famMap[fam]) { famMap[fam] = []; famOrder.push(fam); }
+          famMap[fam].push(it);
+        });
+
+        h += '<div class="fams">';
+        famOrder.forEach(function (fam) {
+          h += '<div class="fam"><div class="fh">' + esc(fam) + '</div><table><tbody>';
+          famMap[fam].forEach(function (it) {
+            var v = String(it.sir || '').toUpperCase();
+            var cls = /^[SIR]$/.test(v) ? v : 'none';
+            var sub = [it.dose || '', it.abbr ? '(' + it.abbr + ')' : ''].filter(Boolean).join(' ');
+            h += '<tr class="' + cls + '">' +
+                 '<td class="ab">' + esc(it.name) +
+                   (sub ? '<small>' + esc(sub) + '</small>' : '') + '</td>' +
+                 '<td class="mm">' + (it.mm ? esc(it.mm) + ' mm' : '-') + '</td>' +
+                 '<td class="sir">' + (SIRLABEL[v] || '-') + '</td></tr>';
+          });
+          h += '</tbody></table></div>';
         });
         h += '</div></div>';
         return;
