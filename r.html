@@ -436,6 +436,80 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     return h + '</div>';
   }
 
+  /* يبني جدول الفحوصات من قائمة مسطّحة، ويعيد بناء عناوين التصنيفات
+     حسب ترتيب ورودها — حتى يظهر عنوان التصنيف من جديد في الصفحة التالية */
+  function tableHtml(flat) {
+    var h = '<table class="res"><thead><tr>' +
+            '<th style="width:38%">Test</th><th class="c" style="width:16%">Result</th>' +
+            '<th class="c" style="width:14%">Unit</th><th>Reference</th></tr></thead><tbody>';
+    var lastCat = null;
+    flat.forEach(function (x) {
+      if (x.cat !== lastCat) {
+        h += '<tr class="cat"><td colspan="4">' + esc(x.cat) + '</td></tr>';
+        lastCat = x.cat;
+      }
+      var r = x.r;
+      h += '<tr><td class="tn">' + esc(r.name || r.nameAr);
+      if (r.nameAr && r.name && r.nameAr !== r.name) h += ' <small>(' + esc(r.nameAr) + ')</small>';
+      h += '</td>';
+      h += '<td class="v">' + esc(r.value || '—') + '</td>';
+      h += '<td class="u">' + esc(r.unit || '') + '</td>';
+      h += '<td class="rf">' + esc(r.reference || '') + '</td></tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
+  var layout = null;   // { head, flat, tail, formSheets }
+
+  /* يرسم الصفحات. chunks = مصفوفة من مصفوفات صفوف؛ null تعني كل الصفوف بصفحة */
+  function paintPages(chunks) {
+    if (!layout) return;
+    var parts = [];
+    if (layout.flat.length) {
+      var groupsList = chunks && chunks.length ? chunks : [layout.flat];
+      groupsList.forEach(function (part, i) {
+        var isLast = i === groupsList.length - 1;
+        parts.push(tableHtml(part) + (isLast ? layout.tail : ''));
+      });
+    } else if (layout.tail.trim() !== '') {
+      parts.push(layout.tail);
+    }
+    layout.formSheets.forEach(function (h) { parts.push(h); });
+    if (!parts.length) parts.push('<div style="text-align:center;color:#9ca3af;padding:30px">لا توجد نتائج بعد</div>');
+    pagesEl.innerHTML = parts.map(function (inner) { return pageShell(layout.head, inner); }).join('');
+  }
+
+  /* يقيس ارتفاع كل صف ويقسّم الجدول على صفحات، فلا تُقصّ أي نتيجة
+     ويبقى التوقيع والذيل بمكانهما أسفل كل صفحة */
+  function paginate() {
+    if (!layout || !layout.flat.length) return;
+    var page = pagesEl.querySelector('.page');
+    if (!page) return;
+    var sheet = page.querySelector('.sheet');
+    var table = page.querySelector('table.res');
+    var sig = page.querySelector('.sig');
+    if (!sheet || !table || !sig) return;
+
+    var sheetTop = sheet.getBoundingClientRect().top;
+    var avail = sheet.getBoundingClientRect().height
+              - (table.getBoundingClientRect().top - sheetTop)
+              - sig.getBoundingClientRect().height - 6;
+    var thead = table.querySelector('thead');
+    var theadH = thead ? thead.getBoundingClientRect().height : 0;
+    var trs = [].slice.call(table.querySelectorAll('tbody tr'));
+    if (avail <= theadH + 30 || !trs.length) return;
+
+    var chunks = [], cur = [], used = theadH, di = 0;
+    for (var i = 0; i < trs.length; i++) {
+      var h = trs[i].getBoundingClientRect().height;
+      if (used + h > avail && cur.length) { chunks.push(cur); cur = []; used = theadH; }
+      used += h;
+      if (!trs[i].classList.contains('cat')) { cur.push(layout.flat[di]); di++; }
+    }
+    if (cur.length) chunks.push(cur);
+    if (chunks.length > 1) { paintPages(chunks); fitContent(); fitPage(); }
+  }
+
   function render(d) {
     var lab = d.lab || {}, p = d.patient || {}, o = d.order || {}, rows = d.rows || [];
     if (lab.name && window.__brand) window.__brand.name = lab.name;
@@ -477,23 +551,11 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
       groups[cat].forEach(function (r) { if (r.kind === 'form') forms.push(r); });
     });
 
-    if (simple.length) {
-      html += '<table class="res"><thead><tr>' +
-              '<th style="width:38%">Test</th><th class="c" style="width:16%">Result</th>' +
-              '<th class="c" style="width:14%">Unit</th><th>Reference</th></tr></thead><tbody>';
-      simple.forEach(function (g) {
-        html += '<tr class="cat"><td colspan="4">' + esc(g[0]) + '</td></tr>';
-        g[1].forEach(function (r) {
-          html += '<tr><td class="tn">' + esc(r.name || r.nameAr);
-          if (r.nameAr && r.name && r.nameAr !== r.name) html += ' <small>(' + esc(r.nameAr) + ')</small>';
-          html += '</td>';
-          html += '<td class="v">' + esc(r.value || '—') + '</td>';
-          html += '<td class="u">' + esc(r.unit || '') + '</td>';
-          html += '<td class="rf">' + esc(r.reference || '') + '</td></tr>';
-        });
-      });
-      html += '</tbody></table>';
-    }
+    // قائمة مسطّحة: كل صف ومعه تصنيفه — أساس التقسيم على صفحات
+    var flat = [];
+    simple.forEach(function (g) { g[1].forEach(function (r) { flat.push({ cat: g[0], r: r }); }); });
+
+    if (flat.length) html += tableHtml(flat);
 
     var hasHcg = rows.some(function (r) {
       return r.code === 'BHCG' || /hcg/i.test(String(r.name || '') + String(r.nameAr || ''));
@@ -506,13 +568,22 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
       html += '</table></div>';
     }
 
-    // ── الصفحات: الجدول العادي صفحة، وكل نموذج (بول/براز/مزرعة) صفحة لحاله ──
-    var sheets = [];
-    if (html.trim() !== '') sheets.push(html);
-    forms.forEach(function (r) { sheets.push(renderForm(r)); });
-    if (!sheets.length) sheets.push('<div style="text-align:center;color:#9ca3af;padding:30px">لا توجد نتائج بعد</div>');
+    // ── الصفحات ──
+    var tail = html.slice(html.indexOf('</table>') + 8);   // جدول hCG إن وُجد
 
-    pagesEl.innerHTML = sheets.map(function (inner) { return pageShell(head, inner); }).join('');
+    // Widal يُطبع مع باقي الفحوصات بنفس الصفحة — تماماً كورقة البرنامج
+    var widal = forms.filter(function (r) { return String(r.code || '').toUpperCase() === 'WIDAL'; });
+    var otherForms = forms.filter(function (r) { return String(r.code || '').toUpperCase() !== 'WIDAL'; });
+    if (widal.length && flat.length) {
+      tail += widal.map(function (r) { return renderForm(r); }).join('');
+    } else if (widal.length) {
+      otherForms = widal.concat(otherForms);
+    }
+    var formSheets = otherForms.map(function (r) { return renderForm(r); });
+
+    layout = { head: head, flat: flat, tail: (flat.length ? tail : html), formSheets: formSheets };
+    paintPages(null);   // تمريرة أولى بكل الصفوف ثم نقيس ونقسّم
+    paginate();
     html = '';
 
     // شريط التكبير — ملء العرض أو الحجم الطبيعي
