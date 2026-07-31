@@ -184,6 +184,26 @@
     font-family:inherit;cursor:pointer;
   }
   .retry:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+/* ورقة التقرير — بنفس تخطيط النسخة المطبوعة */
+.sheet{background:#fff;border-radius:14px;padding:18px 16px 10px;box-shadow:0 1px 3px rgba(17,24,39,.06)}
+.rtitle{text-align:center;font-weight:800;color:#472069;font-size:15px;margin:6px 0 8px}
+.pbox{background:#faf7fb;border-radius:10px;padding:9px 12px;font-size:12.5px;
+  display:grid;grid-template-columns:1fr 1fr;gap:3px 18px;direction:ltr;text-align:left;margin-bottom:10px}
+.pbox b{color:#7A1F3D}
+table.res{width:100%;border-collapse:collapse;direction:ltr;text-align:left;font-size:12.5px}
+table.res th{background:#EFE7F2;color:#3B1656;font-weight:800;padding:6px 8px;text-align:left;font-size:12px}
+table.res td{padding:6px 8px;border-bottom:1px solid #F0EAF2;vertical-align:top}
+table.res tr.cat td{background:#F7F2F8;font-weight:800;color:#5B2A86;padding:5px 8px}
+table.res .tn{font-weight:600;color:#111827}
+table.res .tn small{color:#9CA3AF;font-weight:500}
+table.res .v{font-weight:800;text-align:center;white-space:nowrap}
+table.res .v.hi{background:#FDF07A;border-radius:3px}
+table.res .u{color:#4B5563;text-align:center;white-space:nowrap}
+table.res .rf{color:#4B5563;line-height:1.45}
+.sig{display:flex;justify-content:flex-end;margin:22px 6px 4px}
+.sig div{border-top:1px solid #9ca3af;padding-top:4px;font-size:11.5px;color:#6b7280;min-width:190px;text-align:center}
+@media(max-width:420px){ .pbox{grid-template-columns:1fr} table.res{font-size:11.5px} }
 </style>
 </head>
 <body>
@@ -289,12 +309,17 @@
     var lab = d.lab || {}, p = d.patient || {}, o = d.order || {}, rows = d.rows || [];
     if (lab.name) document.getElementById('labName').textContent = lab.name;
 
-    var html = '<div class="who"><div class="name">' + esc(p.name) + '</div><div class="chips">';
-    if (p.gender)  html += '<span class="chip">' + (p.gender === 'F' ? 'أنثى' : 'ذكر') + '</span>';
-    if (p.ageText) html += '<span class="chip">' + esc(p.ageText) + '</span>';
-    if (o.code)    html += '<span class="chip num">طلب <b>' + esc(o.code) + '</b></span>';
-    if (o.date)    html += '<span class="chip">' + esc(fmtDate(o.date)) + '</span>';
-    html += '</div></div>';
+    var html = '<div class="sheet">';
+    html += '<div class="rtitle">Lab Report</div>';
+
+    html += '<div class="pbox">';
+    html += '<div><b>Patient:</b> ' + esc(p.name || '—') + '</div>';
+    html += '<div><b>Patient ID:</b> ' + esc(p.code || '—') + '</div>';
+    html += '<div><b>Gender:</b> ' + (p.gender === 'F' ? 'Female' : 'Male') + '</div>';
+    html += '<div><b>Age:</b> ' + esc(p.ageText || '—') + '</div>';
+    html += '<div><b>Date:</b> ' + esc(fmtDate(o.date)) + '</div>';
+    html += '<div><b>Order No.:</b> ' + esc(o.code || '—') + '</div>';
+    html += '</div>';
 
     if (o.amended > 0) {
       html += '<div class="amend">هذا التقرير مُعدَّل — اعتمد على هذه النسخة وتجاهل أي نسخة أقدم.</div>';
@@ -303,28 +328,38 @@
     // تجميع حسب الفئة مع الحفاظ على ترتيب ورودها
     var order = [], groups = {};
     rows.forEach(function (r) {
-      var c = r.category || 'فحوصات';
+      var c = r.category || 'Tests';
       if (!groups[c]) { groups[c] = []; order.push(c); }
       groups[c].push(r);
     });
 
+    var simple = [], forms = [];
     order.forEach(function (cat) {
-      html += '<div class="cat">' + esc(cat) + '</div>';
-      groups[cat].forEach(function (r) {
-        if (r.kind === 'form') { html += renderForm(r); return; }
-        var t = TAG[r.flag];
-        html += '<div class="row flag-' + esc(r.flag || 'none') + '">';
-        html += '<div class="meta"><div class="tname">' + esc(r.nameAr || r.name) + '</div>';
-        if (r.name && r.nameAr && r.name !== r.nameAr) {
-          html += '<div class="ten">' + esc(r.name) + '</div>';
-        }
-        if (r.reference) html += '<div class="ref">المعدّل الطبيعي: ' + esc(r.reference) + '</div>';
-        if (t) html += '<span class="tag ' + t[1] + '">' + t[0] + '</span>';
-        html += '</div><div class="val"><div class="v num">' + esc(r.value || '—') + '</div>';
-        if (r.unit) html += '<div class="unit">' + esc(r.unit) + '</div>';
-        html += '</div></div>';
-      });
+      var s2 = groups[cat].filter(function (r) { return r.kind !== 'form'; });
+      if (s2.length) simple.push([cat, s2]);
+      groups[cat].forEach(function (r) { if (r.kind === 'form') forms.push(r); });
     });
+
+    if (simple.length) {
+      html += '<table class="res"><thead><tr>' +
+              '<th style="width:38%">Test</th><th style="width:16%;text-align:center">Result</th>' +
+              '<th style="width:14%;text-align:center">Unit</th><th>Reference</th></tr></thead><tbody>';
+      simple.forEach(function (g) {
+        html += '<tr class="cat"><td colspan="4">' + esc(g[0]) + '</td></tr>';
+        g[1].forEach(function (r) {
+          var abn = r.flag && r.flag !== 'none';
+          html += '<tr><td class="tn">' + esc(r.name || r.nameAr);
+          if (r.nameAr && r.name && r.nameAr !== r.name) html += ' <small>(' + esc(r.nameAr) + ')</small>';
+          html += '</td>';
+          html += '<td class="v"><span class="' + (abn ? 'v hi' : '') + '">' + esc(r.value || '—') + '</span></td>';
+          html += '<td class="u">' + esc(r.unit || '') + '</td>';
+          html += '<td class="rf">' + esc(r.reference || '') + '</td></tr>';
+        });
+      });
+      html += '</tbody></table>';
+    }
+
+    forms.forEach(function (r) { html += renderForm(r); });
 
     var hasHcg = rows.some(function (r) {
       return r.code === 'BHCG' || /hcg/i.test(String(r.name || '') + String(r.nameAr || ''));
@@ -336,6 +371,9 @@
       });
       html += '</table></div>';
     }
+
+    html += '<div class="sig"><div>التوقيع والختم</div></div>';
+    html += '</div>';   // إغلاق الورقة
 
     html += '<div class="note">هذه النتيجة للاطلاع. القراءة النهائية وربطها بحالتك الصحية عند طبيبك — ' +
             'لا تبدأ أو توقف أي علاج بناءً على هذه الصفحة وحدها.</div>';
