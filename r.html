@@ -134,10 +134,14 @@
        #stage كان flex متمركز و overflow:hidden، فالورقة (794px) داخل شاشة
        أضيق كانت تفيض من الجهتين وتُقصّ — هذا سبب القصّ من الشمال. */
     #stage{display:block !important;overflow:visible !important;height:auto !important}
-    #pages{transform:none !important;width:210mm !important;margin:0 !important}
+    #pages{transform:none !important;width:100% !important;margin:0 !important}
+    html,body{height:auto}
     /* ورقة واحدة على الشاشة = ورقة واحدة بالطباعة، بالضبط.
        الارتفاع 296mm (لا 297) بهامش أمان حتى لا تنزلق سطر لصفحة ثانية. */
-    .page{width:210mm !important;height:297mm !important;min-height:0 !important;
+    /* الورقة تأخذ مقاس صندوق الطباعة الفعلي نفسه (100vh/100%)، لا 297mm ثابتة.
+       سفاري بالجوال يقتطع هوامش لرؤوسه وتذييلاته، فالارتفاع الثابت كان يفيض
+       ملّيمترات ويولّد صفحة ثانية شبه فارغة. */
+    .page{width:100% !important;height:100vh !important;min-height:0 !important;
           box-shadow:none !important;overflow:hidden !important;
           break-after:page;page-break-after:always;break-inside:avoid}
     .page:last-child{break-after:auto;page-break-after:auto}
