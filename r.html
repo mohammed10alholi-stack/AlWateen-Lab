@@ -154,7 +154,8 @@
 /* ═══ ورقة A4 حقيقية: 210×297mm بنفس أبعاد النسخة المطبوعة ═══
    المحتوى مبني بعرض 210mm بالضبط، وبنصغّره بصرياً ليناسب الشاشة —
    فالنِسَب وأحجام الخطوط والهوامش تطابق الورقة تماماً. */
-#stage{overflow:hidden;display:flex;justify-content:center}
+#stage{overflow:hidden;display:flex;justify-content:center;align-items:flex-start}
+#pages{align-self:flex-start}
 #pages{width:210mm;flex:none;transform-origin:top center}
 .page{
   width:210mm;min-height:297mm;background:#fff;
