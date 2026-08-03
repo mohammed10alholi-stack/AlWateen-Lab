@@ -106,6 +106,19 @@
   .brandTop .top{padding:14px 12mm 12px}
   .brandBottom{margin-top:auto}
   /* ── زر حفظ النتيجة ── */
+  /* ── ملفّات مرفقة (تقرير جهاز خارجي) ── */
+  .files{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .ftitle{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px}
+  .fbtn{display:flex;align-items:center;gap:10px;width:100%;text-align:right;
+    background:#fff;border:1px solid var(--line);border-radius:11px;padding:11px 12px;
+    margin-bottom:7px;font-family:inherit;font-size:14px;cursor:pointer;color:var(--ink)}
+  .fbtn:last-child{margin-bottom:0}
+  .fbtn:active{background:#FAF7FB}
+  .fico{background:var(--maroon);color:#fff;font-size:10px;font-weight:800;
+    border-radius:5px;padding:3px 6px;letter-spacing:.5px;flex-shrink:0}
+  .fname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .fsize{font-size:11px;color:var(--muted);flex-shrink:0}
+
   .savebar{position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,rgba(251,248,246,0) 0%,var(--paper) 45%)}
   .savebtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
@@ -696,9 +709,9 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
       .catch(function () { /* الترويسة ليست ضرورية لعرض النتيجة */ });
   }
 
-  function docUrl(id) {
+  function docUrl(id, coll) {
     return 'https://firestore.googleapis.com/v1/projects/' + PROJECT +
-           '/databases/(default)/documents/results/' + encodeURIComponent(id) + '?key=' + KEY;
+           '/databases/(default)/documents/' + (coll || 'results') + '/' + encodeURIComponent(id) + '?key=' + KEY;
   }
 
   function load() {
@@ -727,11 +740,55 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
         var raw = j.fields && j.fields.data && j.fields.data.stringValue;
         if (!raw) throw new Error('empty');
         render(JSON.parse(raw));
+        loadFiles(code);
       })
       .catch(function () {
         state('تعذّر فتح النتيجة',
           'تأكد من اتصالك بالإنترنت ثم أعد المحاولة.', true);
       });
+  }
+
+  /* المرفقات: ملفّات PDF خارجية (تقرير جهاز CBC مثلاً) مرفوعة بمستند منفصل */
+  function loadFiles(code) {
+    fetch(docUrl(code, 'files'))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        var raw = j.fields && j.fields.data && j.fields.data.stringValue;
+        if (!raw) return;
+        var list = (JSON.parse(raw).files) || [];
+        if (!list.length) return;
+        paintFiles(list);
+      })
+      .catch(function () { /* المرفقات ليست ضرورية لعرض النتيجة */ });
+  }
+
+  function paintFiles(list) {
+    var h = '<div class="files"><div class="ftitle">\u0645\u0644\u0641\u0651\u0627\u062a \u0645\u0631\u0641\u0642\u0629</div>';
+    list.forEach(function (f, i) {
+      h += '<button class="fbtn" data-i="' + i + '">' +
+           '<span class="fico">PDF</span><span class="fname">' + esc(f.name) + '</span>' +
+           '<span class="fsize">' + Math.max(1, Math.round((f.size || 0) / 1024)) + ' \u0643.\u0628</span></button>';
+    });
+    h += '</div>';
+    extras.insertAdjacentHTML('afterbegin', h);
+
+    Array.prototype.forEach.call(document.querySelectorAll('.fbtn'), function (b) {
+      b.onclick = function () {
+        var f = list[Number(b.getAttribute('data-i'))];
+        try {
+          var bin = atob(f.b64);
+          var arr = new Uint8Array(bin.length);
+          for (var k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+          var url = URL.createObjectURL(new Blob([arr], { type: f.mime || 'application/pdf' }));
+          var a = document.createElement('a');
+          a.href = url; a.target = '_blank'; a.rel = 'noopener';
+          a.download = f.name || 'report.pdf';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        } catch (e) { /* تعذّر الفتح */ }
+      };
+    });
   }
 
   loadBrand();
