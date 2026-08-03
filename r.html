@@ -106,10 +106,9 @@
   .brandTop .top{padding:14px 12mm 12px}
   .brandBottom{margin-top:auto}
   /* ── زر حفظ النتيجة ── */
-  /* ── صفحة مرفق (تقرير جهاز خارجي) ── */
-  .attach{text-align:center}
-  .atitle{font-size:12.5px;font-weight:700;color:var(--maroon);margin-bottom:6px}
-  .aimg{max-width:100%;max-height:235mm;object-fit:contain;display:block;margin:0 auto}
+  /* ── صفحة مرفق (تقرير جهاز خارجي) — تُعرض كما هي بلا ترويسة ── */
+  .apage{justify-content:center;align-items:center;padding:0}
+  .aimg{width:100%;height:auto;max-height:297mm;object-fit:contain;display:block}
 
   .savebar{position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,rgba(251,248,246,0) 0%,var(--paper) 45%)}
@@ -760,9 +759,10 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
   function paintFiles(list) {
     var imgs = list.filter(function (f) { return String(f.mime || '').indexOf('image/') === 0; });
     if (!imgs.length) return;
+    // الملف الأصلي يحمل ترويسته وبيانات مريضه وذيله — فلا نضيف ترويستنا فوقه
     var html = imgs.map(function (f) {
-      return pageShell('', '<div class="attach"><div class="atitle">' + esc(f.name) + '</div>' +
-        '<img class="aimg" alt="" src="data:' + f.mime + ';base64,' + f.b64 + '"></div>');
+      return '<div class="page apage"><img class="aimg" alt="" src="data:' +
+             f.mime + ';base64,' + f.b64 + '"></div>';
     }).join('');
     pagesEl.insertAdjacentHTML('beforeend', html);
     Array.prototype.forEach.call(pagesEl.querySelectorAll('.aimg'), function (im) {
