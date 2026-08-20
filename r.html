@@ -541,6 +541,7 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     html += '<div><b>Age:</b> ' + esc(p.ageText || '—') + '</div>';
     html += '<div><b>Date:</b> ' + esc(fmtDate(o.date)) + '</div>';
     html += '<div><b>Order No.:</b> ' + esc(o.code || '—') + '</div>';
+    if (o.cycleDay) html += '<div><b>Cycle Day:</b> ' + esc(o.cycleDay) + '</div>';
     html += '<div><b>Doctor:</b> ' + esc(o.doctor || '—') + '</div>';
     html += '</div>';
 
