@@ -211,6 +211,10 @@
   display:grid;grid-template-columns:1fr 1fr;gap:3px 28px;direction:ltr;text-align:left;margin-bottom:6px}
 .pbox b{color:#7A1F3D}
 /* تحفّظ السحب الخارجي — أحمر لأنه تحفّظ لا هوية */
+.ptsbar{margin:6px 0 8px;padding:6px 12px;border-radius:8px;font-size:12px;
+  background:#FBF7FC;border:1px solid #E7D9EC;color:#3B1247;text-align:center}
+.ptsbar.ready{background:#FFFBF0;border-color:#C9A227;color:#8A6D0F}
+.ptsbar span{color:#8A7590}
 .odband{display:flex;justify-content:flex-end;margin:6px 0 8px}
 .odband span{transform:rotate(-6deg);display:inline-block;border:2px solid #B01C2E;border-radius:3px;
   padding:3px 14px;color:#B01C2E;text-align:center;background:#fff}
@@ -544,6 +548,17 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
     if (o.cycleDay) html += '<div><b>Cycle Day:</b> ' + esc(o.cycleDay) + '</div>';
     html += '<div><b>Doctor:</b> ' + esc(o.doctor || '—') + '</div>';
     html += '</div>';
+
+    // نقاط الولاء — تشجيع المريض بإظهار قربه من الخصم
+    if (o.points) {
+      var pt = o.points;
+      html += '<div class="ptsbar' + (pt.ready ? ' ready' : '') + '">' +
+        (pt.ready
+          ? '<b>لديك ' + esc(pt.balance) + ' نقطة — تستحقّ خصم ' + esc(pt.reward) + ' على زيارتك القادمة</b>'
+          : 'نقاطك: <b>' + esc(pt.balance) + '</b> من ' + esc(pt.threshold) +
+            ' <span>— تبقّى ' + esc(pt.need) + ' نقطة لخصم ' + esc(pt.reward) + '</span>') +
+        '</div>';
+    }
 
     // تحفّظ: العيّنة سُحبت خارج المختبر — قبل الأرقام لا بعدها
     if (o.outsideDraw) {
