@@ -215,6 +215,11 @@
   background:#FBF7FC;border:1px solid #E7D9EC;color:#3B1247;text-align:center}
 .ptsbar.ready{background:#FFFBF0;border-color:#C9A227;color:#8A6D0F}
 .ptsbar span{color:#8A7590}
+/* شريط التقدّم — يُري المريض قربه من الخصم بنظرة */
+.ptsbar .ptsfill{display:block;height:6px;border-radius:4px;background:#EFE2EA;margin-top:6px;overflow:hidden}
+.ptsbar .ptsfill i{display:block;height:100%;border-radius:4px;background:#B0246E}
+.ptsbar.ready .ptsfill{background:rgba(201,162,39,.25)}
+.ptsbar.ready .ptsfill i{background:#C9A227}
 .odband{display:flex;justify-content:flex-end;margin:6px 0 8px}
 .odband span{transform:rotate(-6deg);display:inline-block;border:2px solid #B01C2E;border-radius:3px;
   padding:3px 14px;color:#B01C2E;text-align:center;background:#fff}
@@ -557,6 +562,8 @@ table.res .rf{color:#4b5563;line-height:1.45;min-width:110px;
           ? '<b>لديك ' + esc(pt.balance) + ' نقطة — تستحقّ خصم ' + esc(pt.reward) + ' على زيارتك القادمة</b>'
           : 'نقاطك: <b>' + esc(pt.balance) + '</b> من ' + esc(pt.threshold) +
             ' <span>— تبقّى ' + esc(pt.need) + ' نقطة لخصم ' + esc(pt.reward) + '</span>') +
+        '<span class="ptsfill"><i style="width:' +
+          Math.max(0, Math.min(100, Math.round((pt.balance / Math.max(1, pt.threshold)) * 100))) + '%"></i></span>' +
         '</div>';
     }
 
