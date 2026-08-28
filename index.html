@@ -791,7 +791,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             .then(function(){ return true; }).catch(function(){ return false; });
         } catch(e){ return Promise.resolve(false); }
       },
-      signOut: function(){ try { return firebase.auth().signOut(); } catch(e){ return Promise.resolve(); } }
+      signOut: function(){ try { return firebase.auth().signOut(); } catch(e){ return Promise.resolve(); } },
+      waitReady: function(){
+        return new Promise(function(res){
+          try {
+            var un = firebase.auth().onAuthStateChanged(function(u){ try{ un(); }catch(e){} res(!!u); });
+            setTimeout(function(){ res(!!firebase.auth().currentUser); }, 6000);
+          } catch(e){ res(false); }
+        });
+      }
     };
   }catch(e){
     var el=document.getElementById("err");if(el){el.style.display="block";el.textContent="خطأ في تهيئة قاعدة البيانات:\n"+(e&&e.message?e.message:e);}
@@ -838,6 +846,64 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     setInterval(beat, 20000);
     document.addEventListener("visibilitychange", function(){ if(!document.hidden) beat(); });
   }catch(e){}
+})();
+</script>
+
+<script>
+/* ── الدخول بالبصمة / Face ID (WebAuthn) — لا تُحفظ كلمة السر إطلاقاً ── */
+(function(){
+  function toB64(buf){
+    var b = new Uint8Array(buf), s = "";
+    for (var i=0;i<b.length;i++) s += String.fromCharCode(b[i]);
+    return btoa(s);
+  }
+  function fromB64(str){
+    var s = atob(str), b = new Uint8Array(s.length);
+    for (var i=0;i<s.length;i++) b[i] = s.charCodeAt(i);
+    return b.buffer;
+  }
+  var KEY = "labBioCredId";
+  window.bioAuth = {
+    supported: function(){
+      return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && location.protocol === "https:");
+    },
+    enrolled: function(){
+      try { return !!localStorage.getItem(KEY); } catch(e){ return false; }
+    },
+    enroll: function(){
+      try {
+        var chal = crypto.getRandomValues(new Uint8Array(32));
+        var uid = crypto.getRandomValues(new Uint8Array(16));
+        return navigator.credentials.create({ publicKey: {
+          challenge: chal,
+          rp: { name: "مختبر الوتين الطبي" },
+          user: { id: uid, name: "lab@alwateen.local", displayName: "موظفو المختبر" },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+          timeout: 60000,
+          attestation: "none"
+        }}).then(function(cred){
+          if(!cred) return false;
+          localStorage.setItem(KEY, toB64(cred.rawId));
+          return true;
+        }).catch(function(){ return false; });
+      } catch(e){ return Promise.resolve(false); }
+    },
+    verify: function(){
+      try {
+        var id = localStorage.getItem(KEY);
+        if(!id) return Promise.resolve(false);
+        var chal = crypto.getRandomValues(new Uint8Array(32));
+        return navigator.credentials.get({ publicKey: {
+          challenge: chal,
+          allowCredentials: [{ type: "public-key", id: fromB64(id) }],
+          userVerification: "required",
+          timeout: 60000
+        }}).then(function(a){ return !!a; }).catch(function(){ return false; });
+      } catch(e){ return Promise.resolve(false); }
+    },
+    clear: function(){ try { localStorage.removeItem(KEY); } catch(e){} }
+  };
 })();
 </script>
 
@@ -2361,6 +2427,7 @@ function SettingsManager({ onSaved }) {
 function VisitsPanel() {
   const [data, setData] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
+  const [sel, setSel] = React.useState(null);
   const SRC_LABEL = { instagram: "إنستغرام", whatsapp: "واتساب", facebook: "فيسبوك", google: "جوجل", telegram: "تلغرام", direct: "مباشر", other: "أخرى" };
   const DEV_LABEL = { mobile: "جوال", desktop: "كمبيوتر" };
   const loadStats = async () => {
@@ -2376,6 +2443,7 @@ function VisitsPanel() {
       const perDay = [];
       const srcCount = {};
       const devCount = {};
+      const all = [];
       for (const day of days) {
         let items = [];
         try {
@@ -2391,6 +2459,7 @@ function VisitsPanel() {
             const dv = v.v || "mobile";
             srcCount[s] = (srcCount[s] || 0) + 1;
             devCount[dv] = (devCount[dv] || 0) + 1;
+            all.push({ t: v.t || 0, s, v: dv, day });
           } catch (e) {
           }
         });
@@ -2415,7 +2484,7 @@ function VisitsPanel() {
         }
       } catch (e) {
       }
-      setData({ perDay, srcCount, devCount, live });
+      setData({ perDay, srcCount, devCount, live, all });
     } finally {
       setBusy(false);
     }
@@ -2430,7 +2499,41 @@ function VisitsPanel() {
   const week = data.perDay.reduce((a, x) => a + x.n, 0);
   const max = Math.max(1, ...data.perDay.map((x) => x.n));
   const card = (label, value, cls) => /* @__PURE__ */ React.createElement("div", { className: "flex-1 rounded-xl p-3 text-center " + cls }, /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-extrabold" }, value), /* @__PURE__ */ React.createElement("p", { className: "mt-0.5 text-xs font-semibold opacity-80" }, label));
-  const rows = (obj, labels) => Object.keys(obj).sort((a, b) => obj[b] - obj[a]).map((k) => /* @__PURE__ */ React.createElement("div", { key: k, className: "flex items-center justify-between border-b border-slate-100 py-1.5 text-sm last:border-0" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-slate-700" }, obj[k]), /* @__PURE__ */ React.createElement("span", { className: "text-slate-600" }, labels[k] || k)));
+  const rows = (obj, labels, kind) => Object.keys(obj).sort((a, b) => obj[b] - obj[a]).map((k) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: k,
+      onClick: () => setSel(sel && sel.kind === kind && sel.key === k ? null : { kind, key: k }),
+      className: "flex w-full items-center justify-between rounded-lg border-b border-slate-100 px-1.5 py-1.5 text-sm last:border-0 " + (sel && sel.kind === kind && sel.key === k ? "bg-teal-50" : "hover:bg-slate-50")
+    },
+    /* @__PURE__ */ React.createElement("span", { className: "font-bold text-slate-700" }, obj[k]),
+    /* @__PURE__ */ React.createElement("span", { className: "flex items-center gap-1 text-slate-600" }, labels[k] || k, /* @__PURE__ */ React.createElement(ChevronDown, { className: "h-3.5 w-3.5 text-slate-400" }))
+  ));
+  const twoDigit = (n) => n < 10 ? "0" + n : "" + n;
+  const detail = () => {
+    if (!sel) return null;
+    const list = (data.all || []).filter((x) => sel.kind === "src" ? x.s === sel.key : x.v === sel.key).sort((a, b) => b.t - a.t).slice(0, 100);
+    const title = (sel.kind === "src" ? SRC_LABEL[sel.key] || sel.key : DEV_LABEL[sel.key] || sel.key) + " — " + list.length + " زيارة";
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "rounded-xl border border-teal-200 bg-white p-3" },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "mb-2 flex items-center justify-between" },
+        /* @__PURE__ */ React.createElement("p", { className: "text-sm font-bold text-teal-700" }, title),
+        /* @__PURE__ */ React.createElement("button", { onClick: () => setSel(null), className: "rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600" }, "إغلاق")
+      ),
+      list.length === 0 ? /* @__PURE__ */ React.createElement("p", { className: "py-3 text-center text-sm text-slate-400" }, "لا توجد زيارات") : /* @__PURE__ */ React.createElement("div", { className: "max-h-64 overflow-y-auto" }, list.map((x, i) => {
+        const d = new Date(x.t);
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          { key: i, className: "flex items-center justify-between border-b border-slate-100 py-1.5 text-sm last:border-0" },
+          /* @__PURE__ */ React.createElement("span", { className: "text-xs text-slate-500" }, sel.kind === "src" ? DEV_LABEL[x.v] || x.v : SRC_LABEL[x.s] || x.s),
+          /* @__PURE__ */ React.createElement("span", { dir: "ltr", className: "text-slate-700" }, x.day.slice(5) + " — " + twoDigit(d.getHours()) + ":" + twoDigit(d.getMinutes()))
+        );
+      }))
+    );
+  };
   return /* @__PURE__ */ React.createElement(
     "div",
     { className: "space-y-3" },
@@ -2456,9 +2559,10 @@ function VisitsPanel() {
     /* @__PURE__ */ React.createElement(
       "div",
       { className: "grid grid-cols-2 gap-2" },
-      /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-slate-100 bg-white p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "مصدر الزيارة"), rows(data.srcCount, SRC_LABEL)),
-      /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-slate-100 bg-white p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "نوع الجهاز"), rows(data.devCount, DEV_LABEL))
+      /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-slate-100 bg-white p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "مصدر الزيارة"), rows(data.srcCount, SRC_LABEL, "src")),
+      /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-slate-100 bg-white p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "نوع الجهاز"), rows(data.devCount, DEV_LABEL, "dev"))
     ),
+    detail(),
     /* @__PURE__ */ React.createElement("button", { onClick: loadStats, className: "w-full rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-600" }, busy ? "جارٍ التحديث..." : "تحديث الآن"),
     /* @__PURE__ */ React.createElement("p", { className: "text-center text-[11px] text-slate-400" }, "يتحدّث تلقائياً كل ٣٠ ثانية — لا تُحفظ أي بيانات تعرّف الزائر")
   );
@@ -2809,15 +2913,69 @@ function StaffLogin({ onAuth }) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [canBio, setCanBio] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+  const [bioErr, setBioErr] = useState("");
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (!window.bioAuth || !window.bioAuth.supported() || !window.bioAuth.enrolled()) return;
+        const signed = window.labAuth && window.labAuth.waitReady ? await window.labAuth.waitReady() : false;
+        if (alive && signed) setCanBio(true);
+      } catch (e) {
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const bioLogin = async () => {
+    setBioErr("");
+    setBioBusy(true);
+    let ok = false;
+    try {
+      ok = await window.bioAuth.verify();
+    } catch (e) {
+      ok = false;
+    }
+    setBioBusy(false);
+    if (ok) onAuth("manager");
+    else setBioErr("تعذّر التحقق — استخدم كلمة السر.");
+  };
   const submit = async () => {
     if (busy) return;
     setErr(false); setBusy(true);
     let ok = false;
     try { ok = window.labAuth ? await window.labAuth.signIn(pin) : false; } catch (e) { ok = false; }
     setBusy(false);
-    if (ok) onAuth("manager"); else setErr(true);
+    if (!ok) { setErr(true); return; }
+    try {
+      if (window.bioAuth && window.bioAuth.supported() && !window.bioAuth.enrolled()) {
+        if (window.confirm("تفعيل الدخول ببصمة الإصبع أو Face ID على هذا الجهاز؟ لن تحتاج كتابة كلمة السر مرة أخرى.")) {
+          await window.bioAuth.enroll();
+        }
+      }
+    } catch (e) {
+    }
+    onAuth("manager");
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "mx-auto max-w-xs py-8 text-center" }, /* @__PURE__ */ React.createElement(ShieldCheck, { className: "mx-auto mb-3 h-12 w-12 text-teal-600" }), /* @__PURE__ */ React.createElement("h3", { className: "mb-1 text-lg font-bold text-slate-800" }, "دخول الموظفين"), /* @__PURE__ */ React.createElement("p", { className: "mb-5 text-sm text-slate-500" }, "أدخل كلمة سر حساب المختبر"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "mx-auto max-w-xs py-8 text-center" }, /* @__PURE__ */ React.createElement(ShieldCheck, { className: "mx-auto mb-3 h-12 w-12 text-teal-600" }), /* @__PURE__ */ React.createElement("h3", { className: "mb-1 text-lg font-bold text-slate-800" }, "دخول الموظفين"), /* @__PURE__ */ React.createElement("p", { className: "mb-5 text-sm text-slate-500" }, canBio ? "ادخل ببصمتك أو بكلمة السر" : "أدخل كلمة سر حساب المختبر"), canBio && /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "mb-4" },
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: bioLogin,
+        disabled: bioBusy,
+        className: "flex w-full items-center justify-center gap-2 rounded-xl border-2 border-teal-500 bg-teal-50 py-3 font-bold text-teal-700 disabled:opacity-60"
+      },
+      /* @__PURE__ */ React.createElement(ShieldCheck, { className: "h-5 w-5" }),
+      bioBusy ? "جارٍ التحقق..." : "الدخول بالبصمة"
+    ),
+    bioErr && /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-sm font-semibold text-red-600" }, bioErr),
+    /* @__PURE__ */ React.createElement("p", { className: "my-3 text-xs text-slate-400" }, "— أو —")
+  ), /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "password",
@@ -2838,7 +2996,19 @@ function StaffLogin({ onAuth }) {
       className: "mt-4 w-full rounded-xl bg-teal-600 py-3 font-bold text-white hover:bg-teal-700"
     },
     busy ? "جارٍ التحقق..." : "دخول"
-  ), /* @__PURE__ */ React.createElement("p", { className: "mt-3 text-center text-xs text-slate-400" }, "للموظفين فقط — أدخل رمز الدخول الخاص بك"));
+  ), /* @__PURE__ */ React.createElement("p", { className: "mt-3 text-center text-xs text-slate-400" }, "للموظفين فقط — أدخل رمز الدخول الخاص بك"), canBio && /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        if (window.confirm("إلغاء الدخول بالبصمة على هذا الجهاز؟")) {
+          window.bioAuth.clear();
+          setCanBio(false);
+        }
+      },
+      className: "mt-2 text-xs font-semibold text-slate-400 underline"
+    },
+    "إلغاء البصمة على هذا الجهاز"
+  ));
 }
 function App() {
   const [mode, setMode] = useState("patient");
