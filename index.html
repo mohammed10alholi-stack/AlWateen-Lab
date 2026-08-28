@@ -778,6 +778,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       set:function(k,v){return db.collection("kv").doc(enc(k)).set({key:String(k),value:String(v)}).then(function(){return {key:k,value:v};});},
       get:function(k){return db.collection("kv").doc(enc(k)).get().then(function(s){return s.exists?{key:k,value:s.data().value}:null;});},
       list:function(p){return db.collection("kv").where("key",">=",p).where("key","<",p+"\uf8ff").get().then(function(snap){return {keys:snap.docs.map(function(d){return d.data().key;})};});},
+      listAll:function(p){return db.collection("kv").where("key",">=",p).where("key","<",p+"\uf8ff").get().then(function(snap){return {items:snap.docs.map(function(d){var x=d.data();return {key:x.key,value:x.value};})};});},
       delete:function(k){return db.collection("kv").doc(enc(k)).delete().then(function(){return {key:k,deleted:true};});}
     };
     // ── دخول الموظفين بحساب المختبر الحقيقي ──
@@ -898,6 +899,22 @@ async function sget(key) {
   return memStore[key] ? JSON.parse(memStore[key]) : null;
 }
 async function slist(prefix) {
+  if (hasStorage && window.storage.listAll) {
+    try {
+      const r = await window.storage.listAll(prefix, true);
+      const out = [];
+      for (const it of r && r.items || []) {
+        try {
+          memStore[it.key] = it.value;
+          const v = JSON.parse(it.value);
+          if (v) out.push(v);
+        } catch (e) {
+        }
+      }
+      return out;
+    } catch (e) {
+    }
+  }
   let keys = [];
   if (hasStorage) {
     try {
@@ -909,12 +926,8 @@ async function slist(prefix) {
   } else {
     keys = Object.keys(memStore).filter((k) => k.startsWith(prefix));
   }
-  const items = [];
-  for (const k of keys) {
-    const v = await sget(k);
-    if (v) items.push(v);
-  }
-  return items;
+  const vals = await Promise.all(keys.map((k) => sget(k)));
+  return vals.filter(Boolean);
 }
 const DEFAULT_SETTINGS = {
   labName: "مختبر الوتين الطبي",
@@ -2271,6 +2284,7 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
   const [resultErr, setResultErr] = useState("");
   const [bQuery, setBQuery] = useState("");
   const [bStatus, setBStatus] = useState("all");
+  const [bView, setBView] = useState("active");
   const [bToday, setBToday] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
@@ -2290,6 +2304,15 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
   }, [load]);
   const setStatus = async (b, statusId) => {
     await sset("bookings:" + b.code, __spreadProps(__spreadValues({}, b), { status: statusId }));
+    load();
+  };
+  const cancelBooking = async (b) => {
+    if (!window.confirm("إلغاء الطلب " + b.code + "؟ رح ينتقل لتبويب «ملغية» وبتقدر ترجع عنه في أي وقت.")) return;
+    await sset("bookings:" + b.code, __spreadProps(__spreadValues({}, b), { status: "cancelled", prevStatus: normStatus(b.status) || "booked" }));
+    load();
+  };
+  const unCancelBooking = async (b) => {
+    await sset("bookings:" + b.code, __spreadProps(__spreadValues({}, b), { status: b.prevStatus || "booked", prevStatus: "" }));
     load();
   };
   const uploadResult = async (b, file) => {
@@ -2350,9 +2373,18 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
   const filteredBookings = bookings.filter((b) => {
     const q = bQuery.trim().toLowerCase();
     const matchQ = !q || (b.name || "").toLowerCase().includes(q) || (b.phone || "").includes(q) || (b.code || "").toLowerCase().includes(q);
-    const matchS = bStatus === "all" || normStatus(b.status) === bStatus || bStatus === "cancelled" && b.status === "cancelled";
+    const isCancelled = b.status === "cancelled";
+    const isReady = !isCancelled && normStatus(b.status) === "ready";
+    const matchV = bView === "cancelled" ? isCancelled : bView === "ready" ? isReady : !isCancelled && !isReady;
+    const matchS = bStatus === "all" || normStatus(b.status) === bStatus;
     const matchT = !bToday || b.date === todayISO();
-    return matchQ && matchS && matchT;
+    return matchQ && matchV && matchS && matchT;
+  });
+  const viewCounts = { active: 0, ready: 0, cancelled: 0 };
+  bookings.forEach((b) => {
+    if (b.status === "cancelled") viewCounts.cancelled++;
+    else if (normStatus(b.status) === "ready") viewCounts.ready++;
+    else viewCounts.active++;
   });
   const exportCSV = () => {
     const headers = ["رقم الحجز", "الاسم", "الجوال", "الفحوصات", "الإجمالي", "التاريخ", "الوقت", "الحالة", "الدفع", "سحب منزلي"];
@@ -2394,7 +2426,22 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     /* @__PURE__ */ React.createElement(ShieldCheck, { className: "h-3.5 w-3.5" }),
     " ",
     isManager ? "مدير — وصول شامل" : "دكتور — وصول طبي"
-  )), /* @__PURE__ */ React.createElement("div", { className: "mb-4 flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 overflow-x-auto" }, tabBtn("bookings", `الحجوزات (${bookings.length})`), isManager && tabBtn("inquiries", `الاستفسارات (${inquiries.length})`), tabBtn("reminders", `تذكيرات (${dueReminders.length})`), isManager && tabBtn("customers", `العملاء (${customers.length})`), isManager && tabBtn("tests", "الفحوصات"), isManager && tabBtn("offers", "العروض"), isManager && tabBtn("packages", "الباقات"), isManager && tabBtn("settings", "الإعدادات")), /* @__PURE__ */ React.createElement("div", { className: "flex shrink-0 gap-2" }, tab !== "tests" && tab !== "settings" && tab !== "offers" && tab !== "packages" && /* @__PURE__ */ React.createElement("button", { onClick: load, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "تحديث" }, /* @__PURE__ */ React.createElement(RefreshCw, { className: "w-4 h-4" })), /* @__PURE__ */ React.createElement("button", { onClick: onLogout, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "خروج" }, /* @__PURE__ */ React.createElement(LogOut, { className: "w-4 h-4" })))), tab === "settings" ? /* @__PURE__ */ React.createElement(SettingsManager, { onSaved: onSettingsSaved }) : tab === "tests" ? /* @__PURE__ */ React.createElement(TestsManager, { tests, onSaved: onTestsSaved }) : tab === "offers" ? /* @__PURE__ */ React.createElement(OffersEditor, { offers, tests, onSaved: onOffersSaved }) : tab === "packages" ? /* @__PURE__ */ React.createElement(PackagesEditor, { packages, tests, onSaved: onPackagesSaved }) : loading ? /* @__PURE__ */ React.createElement("p", { className: "py-10 text-center text-slate-400" }, "جارٍ التحميل...") : tab === "bookings" ? bookings.length === 0 ? /* @__PURE__ */ React.createElement(EmptyState, { text: "لا توجد حجوزات بعد" }) : /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-100" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Search, { className: "h-4 w-4 shrink-0 text-slate-400" }), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "mb-4 flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 overflow-x-auto" }, tabBtn("bookings", `الحجوزات (${bookings.length})`), isManager && tabBtn("inquiries", `الاستفسارات (${inquiries.length})`), tabBtn("reminders", `تذكيرات (${dueReminders.length})`), isManager && tabBtn("customers", `العملاء (${customers.length})`), isManager && tabBtn("tests", "الفحوصات"), isManager && tabBtn("offers", "العروض"), isManager && tabBtn("packages", "الباقات"), isManager && tabBtn("settings", "الإعدادات")), /* @__PURE__ */ React.createElement("div", { className: "flex shrink-0 gap-2" }, tab !== "tests" && tab !== "settings" && tab !== "offers" && tab !== "packages" && /* @__PURE__ */ React.createElement("button", { onClick: load, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "تحديث" }, /* @__PURE__ */ React.createElement(RefreshCw, { className: "w-4 h-4" })), /* @__PURE__ */ React.createElement("button", { onClick: onLogout, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "خروج" }, /* @__PURE__ */ React.createElement(LogOut, { className: "w-4 h-4" })))), tab === "settings" ? /* @__PURE__ */ React.createElement(SettingsManager, { onSaved: onSettingsSaved }) : tab === "tests" ? /* @__PURE__ */ React.createElement(TestsManager, { tests, onSaved: onTestsSaved }) : tab === "offers" ? /* @__PURE__ */ React.createElement(OffersEditor, { offers, tests, onSaved: onOffersSaved }) : tab === "packages" ? /* @__PURE__ */ React.createElement(PackagesEditor, { packages, tests, onSaved: onPackagesSaved }) : loading ? /* @__PURE__ */ React.createElement("p", { className: "py-10 text-center text-slate-400" }, "جارٍ التحميل...") : tab === "bookings" ? bookings.length === 0 ? /* @__PURE__ */ React.createElement(EmptyState, { text: "لا توجد حجوزات بعد" }) : /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, [
+    { id: "active", label: "نشطة" },
+    { id: "ready", label: "جاهزة" },
+    { id: "cancelled", label: "ملغية" }
+  ].map((v) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: v.id,
+      onClick: () => {
+        setBView(v.id);
+        setBStatus("all");
+      },
+      className: "lab-press flex-1 rounded-lg py-2 text-sm font-bold " + (bView === v.id ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-600")
+    },
+    v.label + " (" + viewCounts[v.id] + ")"
+  ))), /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-100" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Search, { className: "h-4 w-4 shrink-0 text-slate-400" }), /* @__PURE__ */ React.createElement(
     "input",
     {
       value: bQuery,
@@ -2409,11 +2456,10 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
       className: "rounded-lg px-2.5 py-1 text-xs font-bold " + (bToday ? "bg-teal-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200")
     },
     "اليوم فقط"
-  ), [
+  ), (bView === "active" ? [
     { id: "all", label: "الكل" },
-    ...STATUSES.map((s) => ({ id: s.id, label: s.label })),
-    { id: "cancelled", label: "ملغي" }
-  ].map((f) => /* @__PURE__ */ React.createElement(
+    ...STATUSES.filter((s) => s.id !== "ready").map((s) => ({ id: s.id, label: s.label }))
+  ] : []).map((f) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: f.id,
@@ -2466,7 +2512,21 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
       className: "lab-press mt-2 w-full rounded-lg py-2 text-sm font-bold " + (b.paymentStatus === "paid" ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-teal-600 text-white hover:bg-teal-700")
     },
     b.paymentStatus === "paid" ? "إلغاء الدفع" : "تأكيد الدفع"
-  ), b.status !== "cancelled" && /* @__PURE__ */ React.createElement("div", { className: "mt-2" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "حالة العينة:"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, STATUSES.map((s) => {
+  ), isManager && (b.status === "cancelled" ? /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => unCancelBooking(b),
+      className: "lab-press mt-2 w-full rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
+    },
+    "↩ تراجع عن الإلغاء"
+  ) : /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => cancelBooking(b),
+      className: "lab-press mt-2 w-full rounded-lg bg-rose-50 py-2 text-sm font-bold text-rose-600 hover:bg-rose-100"
+    },
+    "إلغاء الطلب"
+  )), b.status !== "cancelled" && /* @__PURE__ */ React.createElement("div", { className: "mt-2" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "حالة العينة:"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, STATUSES.map((s) => {
     const active = normStatus(b.status) === s.id;
     return /* @__PURE__ */ React.createElement(
       "button",
