@@ -838,8 +838,24 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       sid = Math.random().toString(36).slice(2,10) + Date.now().toString(36);
       try { sessionStorage.setItem("wsid", sid); } catch(e){}
     }
-    if(fresh){
-      try { S.set("visits:"+day+":"+Date.now()+"_"+sid, JSON.stringify({t:Date.now(), s:srcOf(), v:dev}), true); } catch(e){}
+    var markedDay = null;
+    try { markedDay = localStorage.getItem("wvday"); } catch(e){}
+    if(fresh || markedDay !== day){
+      try { localStorage.setItem("wvday", day); } catch(e){}
+      var vkey = "visits:" + day + ":" + Date.now() + "_" + sid;
+      var vval = JSON.stringify({ t: Date.now(), s: srcOf(), v: dev });
+      var tryWrite = function(n){
+        try {
+          S.set(vkey, vval, true).catch(function(err){
+            console.error("visit write failed", err);
+            if(n > 0) setTimeout(function(){ tryWrite(n-1); }, 3000);
+          });
+        } catch(e){
+          console.error("visit write threw", e);
+          if(n > 0) setTimeout(function(){ tryWrite(n-1); }, 3000);
+        }
+      };
+      tryWrite(2);
     }
     function beat(){ try { S.set("live:"+sid, JSON.stringify({t:Date.now(), s:srcOf(), v:dev}), true); } catch(e){} }
     beat();
@@ -2481,30 +2497,37 @@ function VisitsPanel() {
         d.setDate(d.getDate() - i);
         days.push(d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()));
       }
-      const perDay = [];
       const srcCount = {};
       const devCount = {};
       const all = [];
-      for (const day of days) {
-        let items = [];
+      const byDay = {};
+      let total = 0;
+      let readErr = "";
+      let items = [];
+      try {
+        const r = await window.storage.listAll("visits:", true);
+        items = r && r.items || [];
+      } catch (e) {
+        readErr = String(e && e.message || e);
+      }
+      total = items.length;
+      const inWindow = new Set(days);
+      items.forEach((it) => {
         try {
-          const r = await window.storage.listAll("visits:" + day + ":", true);
-          items = r && r.items || [];
+          const parts = String(it.key).split(":");
+          const day = parts[1] || "";
+          const v = JSON.parse(it.value) || {};
+          byDay[day] = (byDay[day] || 0) + 1;
+          if (!inWindow.has(day)) return;
+          const s = v.s || "direct";
+          const dv = v.v || "mobile";
+          srcCount[s] = (srcCount[s] || 0) + 1;
+          devCount[dv] = (devCount[dv] || 0) + 1;
+          all.push({ t: v.t || 0, s, v: dv, day });
         } catch (e) {
         }
-        perDay.push({ day, n: items.length });
-        items.forEach((it) => {
-          try {
-            const v = JSON.parse(it.value) || {};
-            const s = v.s || "direct";
-            const dv = v.v || "mobile";
-            srcCount[s] = (srcCount[s] || 0) + 1;
-            devCount[dv] = (devCount[dv] || 0) + 1;
-            all.push({ t: v.t || 0, s, v: dv, day });
-          } catch (e) {
-          }
-        });
-      }
+      });
+      const perDay = days.map((day) => ({ day, n: byDay[day] || 0 }));
       let live = 0;
       try {
         const r = await window.storage.listAll("live:", true);
@@ -2525,7 +2548,7 @@ function VisitsPanel() {
         }
       } catch (e) {
       }
-      setData({ perDay, srcCount, devCount, live, all });
+      setData({ perDay, srcCount, devCount, live, all, total, readErr });
     } finally {
       setBusy(false);
     }
@@ -2605,7 +2628,8 @@ function VisitsPanel() {
     ),
     detail(),
     /* @__PURE__ */ React.createElement("button", { onClick: loadStats, className: "w-full rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-600" }, busy ? "جارٍ التحديث..." : "تحديث الآن"),
-    /* @__PURE__ */ React.createElement("p", { className: "text-center text-[11px] text-slate-400" }, "يتحدّث تلقائياً كل ٣٠ ثانية — لا تُحفظ أي بيانات تعرّف الزائر")
+    /* @__PURE__ */ React.createElement("p", { className: "text-center text-[11px] text-slate-400" }, "يتحدّث تلقائياً كل ٣٠ ثانية — لا تُحفظ أي بيانات تعرّف الزائر"),
+    /* @__PURE__ */ React.createElement("p", { className: "text-center text-[11px] text-slate-400" }, "إجمالي الزيارات المسجّلة: " + (data.total || 0) + (data.readErr ? " — خطأ قراءة: " + data.readErr : ""))
   );
 }
 function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onOffersSaved, onPackagesSaved, onSettingsSaved }) {
