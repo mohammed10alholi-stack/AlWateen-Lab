@@ -800,6 +800,48 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 </script>
 
 <script>
+/* ── تتبّع الزيارات (بدون أي بيانات تعرّف الزائر) ── */
+(function(){
+  try{
+    if(!window.storage) return;
+    var S = window.storage;
+    function p(n){ return n<10 ? "0"+n : ""+n; }
+    var d = new Date();
+    var day = d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+    function srcOf(){
+      try{
+        var q = new URLSearchParams(location.search).get("src");
+        if(q) return String(q).slice(0,20);
+        var r = document.referrer || "";
+        if(!r) return "direct";
+        if(/instagram/i.test(r)) return "instagram";
+        if(/whatsapp|wa\.me/i.test(r)) return "whatsapp";
+        if(/facebook|fb\./i.test(r)) return "facebook";
+        if(/google/i.test(r)) return "google";
+        if(/t\.me|telegram/i.test(r)) return "telegram";
+        return "other";
+      }catch(e){ return "direct"; }
+    }
+    var dev = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? "mobile" : "desktop";
+    var sid = null, fresh = false;
+    try { sid = sessionStorage.getItem("wsid"); } catch(e){}
+    if(!sid){
+      fresh = true;
+      sid = Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+      try { sessionStorage.setItem("wsid", sid); } catch(e){}
+    }
+    if(fresh){
+      try { S.set("visits:"+day+":"+Date.now()+"_"+sid, JSON.stringify({t:Date.now(), s:srcOf(), v:dev}), true); } catch(e){}
+    }
+    function beat(){ try { S.set("live:"+sid, JSON.stringify({t:Date.now(), s:srcOf(), v:dev}), true); } catch(e){} }
+    beat();
+    setInterval(beat, 20000);
+    document.addEventListener("visibilitychange", function(){ if(!document.hidden) beat(); });
+  }catch(e){}
+})();
+</script>
+
+<script>
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
 var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
@@ -876,17 +918,34 @@ const hasStorage = typeof window !== "undefined" && window.storage;
 async function sset(key, value) {
   const v = JSON.stringify(value);
   memStore[key] = v;
-  if (hasStorage) {
-    try {
-      await Promise.race([
-        window.storage.set(key, v, true),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8e3))
-      ]);
-    } catch (e) {
-      console.error("set failed/timeout", e);
-    }
+  if (!hasStorage) return true;
+  try {
+    await Promise.race([
+      window.storage.set(key, v, true),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 2e4))
+    ]);
+    return true;
+  } catch (e) {
+    console.error("set failed/timeout", e);
+    return false;
   }
 }
+async function ssetVerify(key, value) {
+  const ok = await sset(key, value);
+  if (!ok) return false;
+  if (!hasStorage) return true;
+  try {
+    const r = await Promise.race([
+      window.storage.get(key, true),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15e3))
+    ]);
+    return !!(r && r.value === JSON.stringify(value));
+  } catch (e) {
+    console.error("verify failed", e);
+    return false;
+  }
+}
+const SAVE_ERR = "لم يتم الحفظ على السيرفر — تأكد من الاتصال بالإنترنت وأعد المحاولة.";
 async function sget(key) {
   if (hasStorage) {
     try {
@@ -1186,6 +1245,7 @@ function OffersEditor({ offers, tests, onSaved }) {
   const [rows, setRows] = useState(() => (offers || []).map((o) => __spreadValues({}, o)));
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
   const update = (i, f, v) => setRows(rows.map((r, idx) => idx === i ? __spreadProps(__spreadValues({}, r), { [f]: v }) : r));
   const toggleTest = (i, id) => setRows(rows.map((r, idx) => {
     if (idx !== i) return r;
@@ -1195,6 +1255,7 @@ function OffersEditor({ offers, tests, onSaved }) {
   const remove = (i) => setRows(rows.filter((_, idx) => idx !== i));
   const add = () => setRows([...rows, { id: newOfferId(), name: "", sub: "", testIds: [], mode: "percent", value: 10, color: OFFER_COLOR_KEYS[rows.length % OFFER_COLOR_KEYS.length], icon: "tag", active: true }]);
   const save = async () => {
+    setErr("");
     const clean = rows.filter((r) => (r.name || "").trim()).map((r) => ({
       id: r.id,
       name: r.name.trim(),
@@ -1207,10 +1268,15 @@ function OffersEditor({ offers, tests, onSaved }) {
       active: r.active !== false
     }));
     setSaving(true);
+    let ok = false;
     try {
-      await sset("config:offers", clean);
+      ok = await ssetVerify("config:offers", clean);
     } finally {
       setSaving(false);
+    }
+    if (!ok) {
+      setErr(SAVE_ERR);
+      return;
     }
     setDone(true);
     onSaved(clean);
@@ -1225,7 +1291,7 @@ function OffersEditor({ offers, tests, onSaved }) {
       const on = (r.testIds || []).includes(t.id);
       return /* @__PURE__ */ React.createElement("button", { key: t.id, type: "button", onClick: () => toggleTest(i, t.id), className: "rounded-full px-2.5 py-1 text-xs font-semibold " + (on ? "bg-teal-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200") }, t.name);
     })))))), /* @__PURE__ */ React.createElement("div", { className: "mt-2 flex items-center justify-between rounded-lg bg-teal-50 px-3 py-2 text-sm" }, /* @__PURE__ */ React.createElement("span", { className: "text-slate-500" }, "السعر قبل: ", /* @__PURE__ */ React.createElement("span", { className: "line-through" }, base, " ₪")), /* @__PURE__ */ React.createElement("span", { className: "font-extrabold text-teal-700" }, "سعر العرض: ", price, " ₪")));
-  })), /* @__PURE__ */ React.createElement("button", { onClick: add, className: "mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-300 py-2.5 text-sm font-bold text-teal-600 hover:bg-teal-50" }, /* @__PURE__ */ React.createElement(Plus, { className: "h-4 w-4" }), " إضافة عرض جديد"), /* @__PURE__ */ React.createElement("button", { onClick: save, disabled: saving, className: "mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 font-bold text-white hover:bg-teal-700 disabled:opacity-60" }, saving ? "جارٍ الحفظ..." : done ? "✓ تم الحفظ" : "حفظ العروض"));
+  })), /* @__PURE__ */ React.createElement("button", { onClick: add, className: "mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-300 py-2.5 text-sm font-bold text-teal-600 hover:bg-teal-50" }, /* @__PURE__ */ React.createElement(Plus, { className: "h-4 w-4" }), " إضافة عرض جديد"), err && /* @__PURE__ */ React.createElement("p", { className: "mt-3 rounded-lg bg-red-50 p-2.5 text-sm font-semibold text-red-600" }, err), /* @__PURE__ */ React.createElement("button", { onClick: save, disabled: saving, className: "mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 font-bold text-white hover:bg-teal-700 disabled:opacity-60" }, saving ? "جارٍ الحفظ..." : done ? "✓ تم الحفظ" : "حفظ العروض"));
 }
 const DEFAULT_PACKAGES = [];
 const PACK_ICONS = { box: Package2, layers: Layers, gem: Gem, shield: ShieldCheck2, drop: Droplet, star: Star, heart: HeartPulse };
@@ -1288,10 +1354,15 @@ function PackagesEditor({ packages, tests, onSaved }) {
       return;
     }
     setSaving(true);
+    let ok = false;
     try {
-      await sset("config:packages", clean);
+      ok = await ssetVerify("config:packages", clean);
     } finally {
       setSaving(false);
+    }
+    if (!ok) {
+      setErr(SAVE_ERR);
+      return;
     }
     setDone(true);
     if (typeof onSaved === "function") onSaved(clean);
@@ -2130,10 +2201,15 @@ function TestsManager({ tests, onSaved }) {
       return;
     }
     setSaving(true);
+    let ok = false;
     try {
-      await sset("config:tests", clean);
+      ok = await ssetVerify("config:tests", clean);
     } finally {
       setSaving(false);
+    }
+    if (!ok) {
+      setErr(SAVE_ERR);
+      return;
     }
     setDone(true);
     onSaved(clean);
@@ -2227,8 +2303,10 @@ function SettingsManager({ onSaved }) {
   }));
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
   const set = (k, v) => setD(__spreadProps(__spreadValues({}, d), { [k]: v }));
   const save = async () => {
+    setErr("");
     setSaving(true);
     const next = {
       labName: d.labName.trim() || DEFAULT_SETTINGS.labName,
@@ -2242,8 +2320,12 @@ function SettingsManager({ onSaved }) {
       doctorPin: d.doctorPin.trim() || "1111",
       theme: d.theme
     };
-    await sset("config:settings", next);
+    const ok = await ssetVerify("config:settings", next);
     setSaving(false);
+    if (!ok) {
+      setErr(SAVE_ERR);
+      return;
+    }
     setDone(true);
     onSaved(next);
     setTimeout(() => setDone(false), 2e3);
@@ -2261,15 +2343,125 @@ function SettingsManager({ onSaved }) {
     /* @__PURE__ */ React.createElement("span", { className: "h-3 w-3 rounded-full", style: { backgroundColor: t.dot } }),
     t.label
   )))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "اسم المختبر"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.labName, onChange: (e) => set("labName", e.target.value) })), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رقم الجوال 1"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.phone1, onChange: (e) => set("phone1", e.target.value), inputMode: "tel" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رقم الجوال 2"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.phone2, onChange: (e) => set("phone2", e.target.value), inputMode: "tel" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "العنوان"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.address, onChange: (e) => set("address", e.target.value) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "الدوام"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.hours, onChange: (e) => set("hours", e.target.value) })), /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-slate-50 p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-xs font-bold text-slate-700" }, "أرقام الدفع"), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "محفظة بال بي"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.palpay, onChange: (e) => set("palpay", e.target.value), inputMode: "tel" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "محفظة جوال بي"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.jawwalpay, onChange: (e) => set("jawwalpay", e.target.value), inputMode: "tel" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "الحساب البنكي (نص)"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.bank, onChange: (e) => set("bank", e.target.value) })))), /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-slate-50 p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-xs font-bold text-slate-700" }, "رموز الدخول"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رمز المدير"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.managerPin, onChange: (e) => set("managerPin", e.target.value), inputMode: "numeric" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رمز الدكتور"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.doctorPin, onChange: (e) => set("doctorPin", e.target.value), inputMode: "numeric" })))), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: save,
-      disabled: saving,
-      className: "flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 font-bold text-white hover:bg-teal-700 disabled:opacity-60"
-    },
-    /* @__PURE__ */ React.createElement(Save, { className: "h-4 w-4" }),
-    done ? "تم الحفظ ✓" : saving ? "جارٍ الحفظ..." : "حفظ الإعدادات"
+    "div",
+    null,
+    err && /* @__PURE__ */ React.createElement("p", { className: "mb-2 rounded-lg bg-red-50 p-2.5 text-sm font-semibold text-red-600" }, err),
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: save,
+        disabled: saving,
+        className: "flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 font-bold text-white hover:bg-teal-700 disabled:opacity-60"
+      },
+      /* @__PURE__ */ React.createElement(Save, { className: "h-4 w-4" }),
+      done ? "تم الحفظ ✓" : saving ? "جارٍ الحفظ..." : "حفظ الإعدادات"
+    )
   ));
+}
+function VisitsPanel() {
+  const [data, setData] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const SRC_LABEL = { instagram: "إنستغرام", whatsapp: "واتساب", facebook: "فيسبوك", google: "جوجل", telegram: "تلغرام", direct: "مباشر", other: "أخرى" };
+  const DEV_LABEL = { mobile: "جوال", desktop: "كمبيوتر" };
+  const loadStats = async () => {
+    setBusy(true);
+    try {
+      const pad = (n) => n < 10 ? "0" + n : "" + n;
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()));
+      }
+      const perDay = [];
+      const srcCount = {};
+      const devCount = {};
+      for (const day of days) {
+        let items = [];
+        try {
+          const r = await window.storage.listAll("visits:" + day + ":", true);
+          items = r && r.items || [];
+        } catch (e) {
+        }
+        perDay.push({ day, n: items.length });
+        items.forEach((it) => {
+          try {
+            const v = JSON.parse(it.value) || {};
+            const s = v.s || "direct";
+            const dv = v.v || "mobile";
+            srcCount[s] = (srcCount[s] || 0) + 1;
+            devCount[dv] = (devCount[dv] || 0) + 1;
+          } catch (e) {
+          }
+        });
+      }
+      let live = 0;
+      try {
+        const r = await window.storage.listAll("live:", true);
+        const now = Date.now();
+        for (const it of r && r.items || []) {
+          let t = 0;
+          try {
+            t = (JSON.parse(it.value) || {}).t || 0;
+          } catch (e) {
+          }
+          if (now - t < 6e4) live++;
+          else if (now - t > 6e5) {
+            try {
+              window.storage.delete(it.key, true);
+            } catch (e) {
+            }
+          }
+        }
+      } catch (e) {
+      }
+      setData({ perDay, srcCount, devCount, live });
+    } finally {
+      setBusy(false);
+    }
+  };
+  React.useEffect(() => {
+    loadStats();
+    const id = setInterval(loadStats, 3e4);
+    return () => clearInterval(id);
+  }, []);
+  if (!data) return /* @__PURE__ */ React.createElement("p", { className: "py-10 text-center text-slate-400" }, "جارٍ تحميل الإحصائيات...");
+  const today = data.perDay[data.perDay.length - 1];
+  const week = data.perDay.reduce((a, x) => a + x.n, 0);
+  const max = Math.max(1, ...data.perDay.map((x) => x.n));
+  const card = (label, value, cls) => /* @__PURE__ */ React.createElement("div", { className: "flex-1 rounded-xl p-3 text-center " + cls }, /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-extrabold" }, value), /* @__PURE__ */ React.createElement("p", { className: "mt-0.5 text-xs font-semibold opacity-80" }, label));
+  const rows = (obj, labels) => Object.keys(obj).sort((a, b) => obj[b] - obj[a]).map((k) => /* @__PURE__ */ React.createElement("div", { key: k, className: "flex items-center justify-between border-b border-slate-100 py-1.5 text-sm last:border-0" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-slate-700" }, obj[k]), /* @__PURE__ */ React.createElement("span", { className: "text-slate-600" }, labels[k] || k)));
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "space-y-3" },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex gap-2" },
+      card("متواجدون الآن", data.live, "bg-emerald-50 text-emerald-700"),
+      card("زيارات اليوم", today ? today.n : 0, "bg-teal-50 text-teal-700"),
+      card("آخر ٧ أيام", week, "bg-slate-100 text-slate-700")
+    ),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "rounded-xl border border-slate-100 bg-white p-3" },
+      /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-xs font-semibold text-slate-500" }, "الزيارات خلال آخر ٧ أيام"),
+      /* @__PURE__ */ React.createElement("div", { className: "flex h-28 items-end justify-between gap-1.5" }, data.perDay.map((x) => /* @__PURE__ */ React.createElement(
+        "div",
+        { key: x.day, className: "flex flex-1 flex-col items-center gap-1" },
+        /* @__PURE__ */ React.createElement("span", { className: "text-[10px] font-bold text-slate-500" }, x.n),
+        /* @__PURE__ */ React.createElement("div", { className: "w-full rounded-t bg-teal-500", style: { height: Math.max(4, Math.round(x.n / max * 80)) + "px" } }),
+        /* @__PURE__ */ React.createElement("span", { className: "text-[9px] text-slate-400" }, x.day.slice(5))
+      )))
+    ),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "grid grid-cols-2 gap-2" },
+      /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-slate-100 bg-white p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "مصدر الزيارة"), rows(data.srcCount, SRC_LABEL)),
+      /* @__PURE__ */ React.createElement("div", { className: "rounded-xl border border-slate-100 bg-white p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-semibold text-slate-500" }, "نوع الجهاز"), rows(data.devCount, DEV_LABEL))
+    ),
+    /* @__PURE__ */ React.createElement("button", { onClick: loadStats, className: "w-full rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-600" }, busy ? "جارٍ التحديث..." : "تحديث الآن"),
+    /* @__PURE__ */ React.createElement("p", { className: "text-center text-[11px] text-slate-400" }, "يتحدّث تلقائياً كل ٣٠ ثانية — لا تُحفظ أي بيانات تعرّف الزائر")
+  );
 }
 function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onOffersSaved, onPackagesSaved, onSettingsSaved }) {
   const settings = useSettings();
@@ -2426,7 +2618,7 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     /* @__PURE__ */ React.createElement(ShieldCheck, { className: "h-3.5 w-3.5" }),
     " ",
     isManager ? "مدير — وصول شامل" : "دكتور — وصول طبي"
-  )), /* @__PURE__ */ React.createElement("div", { className: "mb-4 flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 overflow-x-auto" }, tabBtn("bookings", `الحجوزات (${bookings.length})`), isManager && tabBtn("inquiries", `الاستفسارات (${inquiries.length})`), tabBtn("reminders", `تذكيرات (${dueReminders.length})`), isManager && tabBtn("customers", `العملاء (${customers.length})`), isManager && tabBtn("tests", "الفحوصات"), isManager && tabBtn("offers", "العروض"), isManager && tabBtn("packages", "الباقات"), isManager && tabBtn("settings", "الإعدادات")), /* @__PURE__ */ React.createElement("div", { className: "flex shrink-0 gap-2" }, tab !== "tests" && tab !== "settings" && tab !== "offers" && tab !== "packages" && /* @__PURE__ */ React.createElement("button", { onClick: load, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "تحديث" }, /* @__PURE__ */ React.createElement(RefreshCw, { className: "w-4 h-4" })), /* @__PURE__ */ React.createElement("button", { onClick: onLogout, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "خروج" }, /* @__PURE__ */ React.createElement(LogOut, { className: "w-4 h-4" })))), tab === "settings" ? /* @__PURE__ */ React.createElement(SettingsManager, { onSaved: onSettingsSaved }) : tab === "tests" ? /* @__PURE__ */ React.createElement(TestsManager, { tests, onSaved: onTestsSaved }) : tab === "offers" ? /* @__PURE__ */ React.createElement(OffersEditor, { offers, tests, onSaved: onOffersSaved }) : tab === "packages" ? /* @__PURE__ */ React.createElement(PackagesEditor, { packages, tests, onSaved: onPackagesSaved }) : loading ? /* @__PURE__ */ React.createElement("p", { className: "py-10 text-center text-slate-400" }, "جارٍ التحميل...") : tab === "bookings" ? bookings.length === 0 ? /* @__PURE__ */ React.createElement(EmptyState, { text: "لا توجد حجوزات بعد" }) : /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, [
+  )), /* @__PURE__ */ React.createElement("div", { className: "mb-4 flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 overflow-x-auto" }, tabBtn("bookings", `الحجوزات (${bookings.length})`), isManager && tabBtn("inquiries", `الاستفسارات (${inquiries.length})`), tabBtn("reminders", `تذكيرات (${dueReminders.length})`), isManager && tabBtn("customers", `العملاء (${customers.length})`), isManager && tabBtn("tests", "الفحوصات"), isManager && tabBtn("offers", "العروض"), isManager && tabBtn("packages", "الباقات"), isManager && tabBtn("stats", "الزيارات"), isManager && tabBtn("settings", "الإعدادات")), /* @__PURE__ */ React.createElement("div", { className: "flex shrink-0 gap-2" }, tab !== "tests" && tab !== "settings" && tab !== "offers" && tab !== "packages" && tab !== "stats" && /* @__PURE__ */ React.createElement("button", { onClick: load, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "تحديث" }, /* @__PURE__ */ React.createElement(RefreshCw, { className: "w-4 h-4" })), /* @__PURE__ */ React.createElement("button", { onClick: onLogout, className: "rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200", title: "خروج" }, /* @__PURE__ */ React.createElement(LogOut, { className: "w-4 h-4" })))), tab === "settings" ? /* @__PURE__ */ React.createElement(SettingsManager, { onSaved: onSettingsSaved }) : tab === "tests" ? /* @__PURE__ */ React.createElement(TestsManager, { tests, onSaved: onTestsSaved }) : tab === "offers" ? /* @__PURE__ */ React.createElement(OffersEditor, { offers, tests, onSaved: onOffersSaved }) : tab === "packages" ? /* @__PURE__ */ React.createElement(PackagesEditor, { packages, tests, onSaved: onPackagesSaved }) : loading ? /* @__PURE__ */ React.createElement("p", { className: "py-10 text-center text-slate-400" }, "جارٍ التحميل...") : tab === "bookings" ? bookings.length === 0 ? /* @__PURE__ */ React.createElement(EmptyState, { text: "لا توجد حجوزات بعد" }) : /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, [
     { id: "active", label: "نشطة" },
     { id: "ready", label: "جاهزة" },
     { id: "cancelled", label: "ملغية" }
@@ -2560,7 +2752,7 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
       className: "hidden",
       onChange: (e) => uploadResult(b, e.target.files && e.target.files[0])
     }
-  )))))) : tab === "reminders" ? dueReminders.length === 0 ? /* @__PURE__ */ React.createElement(EmptyState, { text: "لا توجد تذكيرات مستحقّة حالياً" }) : /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs text-slate-500" }, "عملاء حان موعد إعادة فحصهم:"), dueReminders.map((b) => /* @__PURE__ */ React.createElement("div", { key: b.code, className: "rounded-xl border border-slate-100 bg-white p-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("p", { className: "font-semibold text-slate-800" }, b.name), /* @__PURE__ */ React.createElement("span", { dir: "ltr", className: "text-sm text-slate-500" }, b.phone)), /* @__PURE__ */ React.createElement("p", { className: "mt-1 flex items-center gap-1.5 text-sm text-amber-600" }, /* @__PURE__ */ React.createElement(Bell, { className: "h-3.5 w-3.5" }), " إعادة ", b.followUpLabel, " — استحقّت ", fmtDate(b.followUpDate)), /* @__PURE__ */ React.createElement("div", { className: "mt-3 grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement(
+  )))))) : tab === "stats" ? /* @__PURE__ */ React.createElement(VisitsPanel, null) : tab === "reminders" ? dueReminders.length === 0 ? /* @__PURE__ */ React.createElement(EmptyState, { text: "لا توجد تذكيرات مستحقّة حالياً" }) : /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs text-slate-500" }, "عملاء حان موعد إعادة فحصهم:"), dueReminders.map((b) => /* @__PURE__ */ React.createElement("div", { key: b.code, className: "rounded-xl border border-slate-100 bg-white p-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("p", { className: "font-semibold text-slate-800" }, b.name), /* @__PURE__ */ React.createElement("span", { dir: "ltr", className: "text-sm text-slate-500" }, b.phone)), /* @__PURE__ */ React.createElement("p", { className: "mt-1 flex items-center gap-1.5 text-sm text-amber-600" }, /* @__PURE__ */ React.createElement(Bell, { className: "h-3.5 w-3.5" }), " إعادة ", b.followUpLabel, " — استحقّت ", fmtDate(b.followUpDate)), /* @__PURE__ */ React.createElement("div", { className: "mt-3 grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement(
     "a",
     {
       href: waLink(
