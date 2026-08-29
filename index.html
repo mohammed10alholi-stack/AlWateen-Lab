@@ -1210,6 +1210,13 @@ function waLink(phone, text, cc) {
   if (p.startsWith("0")) p = p.slice(1);
   return "https://wa.me/" + (cc || "970") + p + "?text=" + encodeURIComponent(text);
 }
+function siteUrl() {
+  try {
+    return location.origin + location.pathname.replace(/index\.html$/, "") + "?src=whatsapp";
+  } catch (e) {
+    return "";
+  }
+}
 function lastCC(phone) {
   try {
     return localStorage.getItem("wacc:" + String(phone || "").replace(/\D/g, "")) || "";
@@ -3087,8 +3094,8 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     phone: b.phone,
     label: "إشعار العميل أن النتيجة جاهزة",
     text: `مرحباً ${b.name}، نتيجة فحصك في ${settings.labName} أصبحت جاهزة ✅
-يمكنك الاطلاع عليها عبر تطبيقنا من قسم "استعلام نتيجة" باسمك.
-رقم الحجز: ${b.code}`
+اطّلع عليها من قسم "استعلام نتيجة" برقم حجزك: ${b.code}
+${siteUrl()}`
   }), /* @__PURE__ */ React.createElement("div", { className: "mt-2 rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100" }, b.resultFile || b.hasResult ? /* @__PURE__ */ React.createElement(
     "div",
     null,
@@ -3126,7 +3133,8 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     phone: b.phone,
     label: "تذكير واتساب",
     text: `مرحباً ${b.name}، تذكير من ${settings.labName}: حان موعد إعادة فحص ${b.followUpLabel}. يسعدنا خدمتك.
-للحجز: ${settings.phones[0]}`
+احجز موعدك أونلاين: ${siteUrl()}
+أو اتصل بنا: ${settings.phones[0]}`
   }), /* @__PURE__ */ React.createElement(
     "button",
     {
