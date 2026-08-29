@@ -1676,9 +1676,21 @@ const TIMES = [
   "19:00",
   "20:00"
 ];
+async function genUniqueCode() {
+  for (let i = 0; i < 6; i++) {
+    const c = genCode();
+    try {
+      const taken = await sget("bookings:" + c);
+      if (!taken) return c;
+    } catch (e) {
+      return c;
+    }
+  }
+  return genCode() + genCode().slice(-2);
+}
 function genCode() {
   const A = "ACDEFGHJKLMNPQRTUVWXY3479";
-  const n = 10;
+  const n = 5;
   let out = "";
   try {
     const b = new Uint8Array(n);
@@ -1867,7 +1879,7 @@ function BookingForm({ tests, offers, packages, initialOffer, initialPackage, in
       return;
     }
     setSaving(true);
-    const code = genCode();
+    const code = await genUniqueCode();
     let rec = loyalty;
     if (!rec) rec = await sget("points:" + phone.trim());
     const prevPoints = rec ? Number(rec.points || 0) : 0;
