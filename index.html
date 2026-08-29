@@ -857,9 +857,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       };
       tryWrite(2);
     }
-    function beat(){ try { S.set("live:"+sid, JSON.stringify({t:Date.now(), s:srcOf(), v:dev}), true); } catch(e){} }
+    var lastBeat = 0;
+    function beat(){
+      if(document.hidden) return;
+      var now = Date.now();
+      if(now - lastBeat < 150000) return;
+      lastBeat = now;
+      try { S.set("live:"+sid, JSON.stringify({t:now, s:srcOf(), v:dev}), true); } catch(e){}
+    }
     beat();
-    setInterval(beat, 20000);
+    setInterval(beat, 180000);
     document.addEventListener("visibilitychange", function(){ if(!document.hidden) beat(); });
   }catch(e){}
 })();
@@ -1028,10 +1035,41 @@ async function ssetVerify(key, value) {
   }
 }
 const SAVE_ERR = "لم يتم الحفظ على السيرفر — تأكد من الاتصال بالإنترنت وأعد المحاولة.";
+function openDataFile(dataUrl, name, forceDownload) {
+  try {
+    const parts = String(dataUrl || "").split(",");
+    const mime = (String(parts[0] || "").match(/data:([^;]+)/) || [])[1] || "application/octet-stream";
+    const bin = atob(parts[1] || "");
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], { type: mime }));
+    const a = document.createElement("a");
+    a.href = url;
+    if (forceDownload) a.download = name || "result";
+    else {
+      a.target = "_blank";
+      a.rel = "noreferrer";
+    }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 6e4);
+    return true;
+  } catch (e) {
+    console.error("openDataFile failed", e);
+    return false;
+  }
+}
+function withTimeout(p, ms, label) {
+  return Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error("انتهت مهلة " + label)), ms))
+  ]);
+}
 async function sget(key) {
   if (hasStorage) {
     try {
-      const r = await window.storage.get(key, true);
+      const r = await withTimeout(window.storage.get(key, true), 2e4, "القراءة");
       return r ? JSON.parse(r.value) : null;
     } catch (e) {
       return memStore[key] ? JSON.parse(memStore[key]) : null;
@@ -1042,7 +1080,7 @@ async function sget(key) {
 async function slist(prefix) {
   if (hasStorage && window.storage.listAll) {
     try {
-      const r = await window.storage.listAll(prefix, true);
+      const r = await withTimeout(window.storage.listAll(prefix, true), 3e4, "القراءة");
       const out = [];
       for (const it of r && r.items || []) {
         try {
@@ -1059,7 +1097,7 @@ async function slist(prefix) {
   let keys = [];
   if (hasStorage) {
     try {
-      const r = await window.storage.list(prefix, true);
+      const r = await withTimeout(window.storage.list(prefix, true), 3e4, "القراءة");
       keys = r ? r.keys : [];
     } catch (e) {
       keys = Object.keys(memStore).filter((k) => k.startsWith(prefix));
@@ -2190,7 +2228,7 @@ function ResultCard({ b, onCancel, onReschedule }) {
     },
     /* @__PURE__ */ React.createElement(Download, { className: "h-4 w-4" }),
     " تحميل الفاتورة PDF"
-  ), !cancelled && /* @__PURE__ */ React.createElement(StatusStepper, { status: b.status }), norm === "ready" && /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "rounded-lg bg-emerald-50 p-3 text-center text-sm font-semibold text-emerald-700" }, "نتيجتك جاهزة!"), b.resultFile ? /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, b.resultKind === "image" && /* @__PURE__ */ React.createElement("img", { src: b.resultFile, alt: "النتيجة", className: "mb-2 w-full rounded-lg ring-1 ring-slate-200" }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("a", { href: b.resultFile, target: "_blank", rel: "noreferrer", className: "flex flex-1 items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 text-sm font-bold text-white hover:bg-teal-700" }, /* @__PURE__ */ React.createElement(FileCheck, { className: "h-4 w-4" }), " عرض النتيجة"), /* @__PURE__ */ React.createElement("a", { href: b.resultFile, download: b.resultName || "result", className: "flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200" }, /* @__PURE__ */ React.createElement(Download, { className: "h-4 w-4" }), " تحميل"))) : /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-center text-xs text-slate-500" }, "يمكنك استلامها من المختبر، وسيتم إرفاقها هنا إن رُفعت.")), cancelled && /* @__PURE__ */ React.createElement("p", { className: "mt-3 rounded-lg bg-rose-50 p-3 text-center text-sm font-semibold text-rose-600" }, "تم إلغاء هذا الموعد."), canModify && /* @__PURE__ */ React.createElement("div", { className: "mt-4 border-t border-slate-100 pt-3" }, editing ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "date", min: todayISO(), value: nd, onChange: (e) => setNd(e.target.value), className: inputCls }), /* @__PURE__ */ React.createElement("select", { value: nt, onChange: (e) => setNt(e.target.value), className: inputCls }, TIMES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t, value: t }, t)))), err && /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-sm font-semibold text-red-600" }, err), /* @__PURE__ */ React.createElement("div", { className: "mt-2 grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: saveResched, className: "lab-press rounded-lg bg-teal-600 py-2 text-sm font-bold text-white hover:bg-teal-700" }, "حفظ الموعد"), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditing(false), className: "lab-press rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-600" }, "تراجع"))) : confirmCancel ? /* @__PURE__ */ React.createElement("div", { className: "rounded-lg bg-rose-50 p-3 text-center" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-sm font-semibold text-rose-700" }, "تأكيد إلغاء الموعد؟"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => onCancel(b), className: "lab-press rounded-lg bg-rose-600 py-2 text-sm font-bold text-white" }, "نعم، ألغِ"), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmCancel(false), className: "lab-press rounded-lg bg-white py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200" }, "تراجع"))) : /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setEditing(true), className: "lab-press rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200" }, "تعديل الموعد"), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmCancel(true), className: "lab-press rounded-lg bg-rose-50 py-2 text-sm font-bold text-rose-600 hover:bg-rose-100" }, "إلغاء الموعد"))));
+  ), !cancelled && /* @__PURE__ */ React.createElement(StatusStepper, { status: b.status }), norm === "ready" && /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "rounded-lg bg-emerald-50 p-3 text-center text-sm font-semibold text-emerald-700" }, "نتيجتك جاهزة!"), b.resultFile ? /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, b.resultKind === "image" && /* @__PURE__ */ React.createElement("img", { src: b.resultFile, alt: "النتيجة", className: "mb-2 w-full rounded-lg ring-1 ring-slate-200" }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => openDataFile(b.resultFile, b.resultName, false), className: "flex flex-1 items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 text-sm font-bold text-white hover:bg-teal-700" }, /* @__PURE__ */ React.createElement(FileCheck, { className: "h-4 w-4" }), " عرض النتيجة"), /* @__PURE__ */ React.createElement("button", { onClick: () => openDataFile(b.resultFile, b.resultName, true), className: "flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200" }, /* @__PURE__ */ React.createElement(Download, { className: "h-4 w-4" }), " تحميل"))) : /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-center text-xs text-slate-500" }, "يمكنك استلامها من المختبر، وسيتم إرفاقها هنا إن رُفعت.")), cancelled && /* @__PURE__ */ React.createElement("p", { className: "mt-3 rounded-lg bg-rose-50 p-3 text-center text-sm font-semibold text-rose-600" }, "تم إلغاء هذا الموعد."), canModify && /* @__PURE__ */ React.createElement("div", { className: "mt-4 border-t border-slate-100 pt-3" }, editing ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "date", min: todayISO(), value: nd, onChange: (e) => setNd(e.target.value), className: inputCls }), /* @__PURE__ */ React.createElement("select", { value: nt, onChange: (e) => setNt(e.target.value), className: inputCls }, TIMES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t, value: t }, t)))), err && /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-sm font-semibold text-red-600" }, err), /* @__PURE__ */ React.createElement("div", { className: "mt-2 grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: saveResched, className: "lab-press rounded-lg bg-teal-600 py-2 text-sm font-bold text-white hover:bg-teal-700" }, "حفظ الموعد"), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditing(false), className: "lab-press rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-600" }, "تراجع"))) : confirmCancel ? /* @__PURE__ */ React.createElement("div", { className: "rounded-lg bg-rose-50 p-3 text-center" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-sm font-semibold text-rose-700" }, "تأكيد إلغاء الموعد؟"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => onCancel(b), className: "lab-press rounded-lg bg-rose-600 py-2 text-sm font-bold text-white" }, "نعم، ألغِ"), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmCancel(false), className: "lab-press rounded-lg bg-white py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200" }, "تراجع"))) : /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setEditing(true), className: "lab-press rounded-lg bg-slate-100 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200" }, "تعديل الموعد"), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmCancel(true), className: "lab-press rounded-lg bg-rose-50 py-2 text-sm font-bold text-rose-600 hover:bg-rose-100" }, "إلغاء الموعد"))));
 }
 function ResultLookup() {
   const [q, setQ] = useState("");
@@ -2406,6 +2444,32 @@ function SettingsManager({ onSaved }) {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState("");
+  const [bioOn, setBioOn] = useState(() => !!(window.bioAuth && window.bioAuth.enrolled()));
+  const [bioMsg, setBioMsg] = useState("");
+  const bioSupported = !!(window.bioAuth && window.bioAuth.supported());
+  const enrollBio = async () => {
+    setBioMsg("");
+    let ok = false;
+    try {
+      ok = await window.bioAuth.enroll();
+    } catch (e) {
+      ok = false;
+    }
+    if (ok) {
+      setBioOn(true);
+      setBioMsg("تم التفعيل ✓ — ستجد زر البصمة في شاشة الدخول");
+    } else {
+      setBioMsg("لم يتم التفعيل — تأكد أن بصمة الجهاز أو Face ID مفعّلة، وحاول مرة أخرى");
+    }
+  };
+  const clearBio = () => {
+    try {
+      window.bioAuth.clear();
+    } catch (e) {
+    }
+    setBioOn(false);
+    setBioMsg("تم إلغاء البصمة على هذا الجهاز");
+  };
   const set = (k, v) => setD(__spreadProps(__spreadValues({}, d), { [k]: v }));
   const save = async () => {
     setErr("");
@@ -2446,6 +2510,24 @@ function SettingsManager({ onSaved }) {
     /* @__PURE__ */ React.createElement("span", { className: "h-3 w-3 rounded-full", style: { backgroundColor: t.dot } }),
     t.label
   )))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "اسم المختبر"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.labName, onChange: (e) => set("labName", e.target.value) })), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رقم الجوال 1"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.phone1, onChange: (e) => set("phone1", e.target.value), inputMode: "tel" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رقم الجوال 2"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.phone2, onChange: (e) => set("phone2", e.target.value), inputMode: "tel" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "العنوان"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.address, onChange: (e) => set("address", e.target.value) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "الدوام"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.hours, onChange: (e) => set("hours", e.target.value) })), /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-slate-50 p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-xs font-bold text-slate-700" }, "أرقام الدفع"), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "محفظة بال بي"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.palpay, onChange: (e) => set("palpay", e.target.value), inputMode: "tel" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "محفظة جوال بي"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.jawwalpay, onChange: (e) => set("jawwalpay", e.target.value), inputMode: "tel" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "الحساب البنكي (نص)"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.bank, onChange: (e) => set("bank", e.target.value) })))), /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-slate-50 p-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-xs font-bold text-slate-700" }, "رموز الدخول"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رمز المدير"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.managerPin, onChange: (e) => set("managerPin", e.target.value), inputMode: "numeric" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: lbl }, "رمز الدكتور"), /* @__PURE__ */ React.createElement("input", { className: fld, value: d.doctorPin, onChange: (e) => set("doctorPin", e.target.value), inputMode: "numeric" })))), /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3" },
+    /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-xs font-bold text-slate-700" }, "الدخول بالبصمة / Face ID"),
+    !bioSupported ? /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-slate-500" }, "هذا الجهاز أو المتصفح لا يدعم الدخول بالبصمة.") : /* @__PURE__ */ React.createElement(
+      "div",
+      null,
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: bioOn ? clearBio : enrollBio,
+          className: "w-full rounded-lg py-2.5 text-sm font-bold " + (bioOn ? "bg-slate-200 text-slate-700" : "bg-teal-600 text-white")
+        },
+        bioOn ? "إلغاء البصمة على هذا الجهاز" : "تفعيل الدخول بالبصمة"
+      ),
+      bioMsg && /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-[11px] font-semibold text-slate-600" }, bioMsg),
+      /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-[11px] leading-relaxed text-slate-500" }, "كلمة السر لا تُحفظ — البصمة تفتح الجلسة على هذا الجهاز فقط.")
+    )
+  ), /* @__PURE__ */ React.createElement(
     "div",
     { className: "mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3" },
     /* @__PURE__ */ React.createElement("p", { className: "mb-1 text-xs font-bold text-slate-700" }, "إشعارات الجوال (ntfy)"),
@@ -2505,7 +2587,7 @@ function VisitsPanel() {
       let readErr = "";
       let items = [];
       try {
-        const r = await window.storage.listAll("visits:", true);
+        const r = await withTimeout(window.storage.listAll("visits:", true), 3e4, "القراءة");
         items = r && r.items || [];
       } catch (e) {
         readErr = String(e && e.message || e);
@@ -2530,7 +2612,7 @@ function VisitsPanel() {
       const perDay = days.map((day) => ({ day, n: byDay[day] || 0 }));
       let live = 0;
       try {
-        const r = await window.storage.listAll("live:", true);
+        const r = await withTimeout(window.storage.listAll("live:", true), 2e4, "القراءة");
         const now = Date.now();
         for (const it of r && r.items || []) {
           let t = 0;
@@ -2538,8 +2620,8 @@ function VisitsPanel() {
             t = (JSON.parse(it.value) || {}).t || 0;
           } catch (e) {
           }
-          if (now - t < 6e4) live++;
-          else if (now - t > 6e5) {
+          if (now - t < 6e5) live++;
+          else if (now - t > 216e5) {
             try {
               window.storage.delete(it.key, true);
             } catch (e) {
@@ -2913,7 +2995,7 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     },
     /* @__PURE__ */ React.createElement(Bell, { className: "h-4 w-4" }),
     " إشعار العميل أن النتيجة جاهزة (واتساب)"
-  ), /* @__PURE__ */ React.createElement("div", { className: "mt-2 rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100" }, b.resultFile ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "flex items-center gap-1.5 text-sm font-semibold text-emerald-700" }, /* @__PURE__ */ React.createElement(FileCheck, { className: "h-4 w-4" }), " النتيجة مُرسلة للمريض"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-3" }, b.resultKind === "image" ? /* @__PURE__ */ React.createElement("button", { onClick: () => setViewer(b.resultFile), className: "text-sm font-semibold text-teal-600" }, "عرض") : /* @__PURE__ */ React.createElement("a", { href: b.resultFile, target: "_blank", rel: "noreferrer", className: "text-sm font-semibold text-teal-600" }, "عرض"), /* @__PURE__ */ React.createElement("button", { onClick: () => removeResult(b), className: "text-sm font-semibold text-red-500" }, "حذف"))) : /* @__PURE__ */ React.createElement("label", { className: "flex cursor-pointer items-center justify-center gap-2 text-sm font-semibold text-teal-600" }, /* @__PURE__ */ React.createElement(Upload, { className: "h-4 w-4" }), resultUploading === b.code ? "جارٍ الرفع..." : "ارفع نتيجة الفحص (PDF أو صورة)", /* @__PURE__ */ React.createElement(
+  ), /* @__PURE__ */ React.createElement("div", { className: "mt-2 rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100" }, b.resultFile ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "flex items-center gap-1.5 text-sm font-semibold text-emerald-700" }, /* @__PURE__ */ React.createElement(FileCheck, { className: "h-4 w-4" }), " النتيجة مُرسلة للمريض"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-3" }, b.resultKind === "image" ? /* @__PURE__ */ React.createElement("button", { onClick: () => setViewer(b.resultFile), className: "text-sm font-semibold text-teal-600" }, "عرض") : /* @__PURE__ */ React.createElement("button", { onClick: () => openDataFile(b.resultFile, b.resultName, false), className: "text-sm font-semibold text-teal-600" }, "عرض"), /* @__PURE__ */ React.createElement("button", { onClick: () => openDataFile(b.resultFile, b.resultName, true), className: "text-sm font-semibold text-slate-500" }, "تنزيل"), /* @__PURE__ */ React.createElement("button", { onClick: () => removeResult(b), className: "text-sm font-semibold text-red-500" }, "حذف"))) : /* @__PURE__ */ React.createElement("label", { className: "flex cursor-pointer items-center justify-center gap-2 text-sm font-semibold text-teal-600" }, /* @__PURE__ */ React.createElement(Upload, { className: "h-4 w-4" }), resultUploading === b.code ? "جارٍ الرفع..." : "ارفع نتيجة الفحص (PDF أو صورة)", /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "file",
@@ -3015,14 +3097,6 @@ function StaffLogin({ onAuth }) {
     try { ok = window.labAuth ? await window.labAuth.signIn(pin) : false; } catch (e) { ok = false; }
     setBusy(false);
     if (!ok) { setErr(true); return; }
-    try {
-      if (window.bioAuth && window.bioAuth.supported() && !window.bioAuth.enrolled()) {
-        if (window.confirm("تفعيل الدخول ببصمة الإصبع أو Face ID على هذا الجهاز؟ لن تحتاج كتابة كلمة السر مرة أخرى.")) {
-          await window.bioAuth.enroll();
-        }
-      }
-    } catch (e) {
-    }
     onAuth("manager");
   };
   return /* @__PURE__ */ React.createElement("div", { className: "mx-auto max-w-xs py-8 text-center" }, /* @__PURE__ */ React.createElement(ShieldCheck, { className: "mx-auto mb-3 h-12 w-12 text-teal-600" }), /* @__PURE__ */ React.createElement("h3", { className: "mb-1 text-lg font-bold text-slate-800" }, "دخول الموظفين"), /* @__PURE__ */ React.createElement("p", { className: "mb-5 text-sm text-slate-500" }, canBio ? "ادخل ببصمتك أو بكلمة السر" : "أدخل كلمة سر حساب المختبر"), canBio && /* @__PURE__ */ React.createElement(
