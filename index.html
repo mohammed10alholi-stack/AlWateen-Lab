@@ -1035,6 +1035,33 @@ async function ssetVerify(key, value) {
   }
 }
 const SAVE_ERR = "لم يتم الحفظ على السيرفر — تأكد من الاتصال بالإنترنت وأعد المحاولة.";
+const RESULT_CHUNK = 6e5;
+async function saveResultChunks(code, data) {
+  const parts = [];
+  for (let i = 0; i < data.length; i += RESULT_CHUNK) parts.push(data.slice(i, i + RESULT_CHUNK));
+  for (let i = 0; i < parts.length; i++) {
+    const ok = await sset("results:" + code + ":" + i, { i, d: parts[i] });
+    if (!ok) return 0;
+  }
+  return parts.length;
+}
+async function loadResultChunks(code, n) {
+  let out = "";
+  for (let i = 0; i < Number(n || 0); i++) {
+    const rec = await sget("results:" + code + ":" + i);
+    if (!rec || !rec.d) return "";
+    out += rec.d;
+  }
+  return out;
+}
+async function deleteResultChunks(code, n) {
+  for (let i = 0; i < Number(n || 0); i++) {
+    try {
+      if (window.storage && window.storage.delete) await window.storage.delete("results:" + code + ":" + i, true);
+    } catch (e) {
+    }
+  }
+}
 function openDataFile(dataUrl, name, forceDownload) {
   try {
     const parts = String(dataUrl || "").split(",");
@@ -2259,10 +2286,10 @@ function ResultLookup() {
     setLoading(true);
     let b = null;
     try { b = await sget("bookings:LAB-" + c); } catch (e) { b = null; }
-    if (b && b.hasResult && !b.resultFile) {
+    if (b && b.hasResult && !b.resultFile && b.resultChunks) {
       try {
-        const rec = await sget("results:" + b.code);
-        if (rec && rec.data) b = __spreadProps(__spreadValues({}, b), { resultFile: rec.data, resultKind: rec.kind || b.resultKind, resultName: rec.name || b.resultName });
+        const data = await loadResultChunks(b.code, b.resultChunks);
+        if (data) b = __spreadProps(__spreadValues({}, b), { resultFile: data });
       } catch (e) {
       }
     }
@@ -2783,13 +2810,15 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     setResultUploading(b.code);
     try {
       const r = await fileToResult(file);
-      const okFile = await sset("results:" + b.code, { data: r.data, kind: r.kind, name: r.name });
-      if (!okFile) throw new Error("upload_failed");
+      await deleteResultChunks(b.code, b.resultChunks);
+      const n = await saveResultChunks(b.code, r.data);
+      if (!n) throw new Error("upload_failed");
       const okRec = await sset("bookings:" + b.code, __spreadProps(__spreadValues({}, b), {
         resultFile: "",
         resultKind: r.kind,
         resultName: r.name,
         hasResult: true,
+        resultChunks: n,
         status: "ready"
         // رفع النتيجة يعني أنها جاهزة
       }));
@@ -2803,11 +2832,8 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     setResultUploading(null);
   };
   const removeResult = async (b) => {
-    try {
-      if (window.storage && window.storage.delete) await window.storage.delete("results:" + b.code, true);
-    } catch (e) {
-    }
-    await sset("bookings:" + b.code, __spreadProps(__spreadValues({}, b), { resultFile: "", resultKind: "", resultName: "", hasResult: false }));
+    await deleteResultChunks(b.code, b.resultChunks);
+    await sset("bookings:" + b.code, __spreadProps(__spreadValues({}, b), { resultFile: "", resultKind: "", resultName: "", hasResult: false, resultChunks: 0 }));
     load();
   };
   const [fileReady, setFileReady] = useState(null);
@@ -2816,10 +2842,7 @@ function StaffPanel({ role, tests, offers, packages, onLogout, onTestsSaved, onO
     setFileReady(null);
     setFileBusy(b.code);
     let data = b.resultFile || "";
-    if (!data) {
-      const rec = await sget("results:" + b.code);
-      data = rec && rec.data || "";
-    }
+    if (!data && b.resultChunks) data = await loadResultChunks(b.code, b.resultChunks);
     setFileBusy("");
     if (!data) {
       setResultErr(b.code + ": تعذّر جلب الملف، حاول مرة أخرى.");
