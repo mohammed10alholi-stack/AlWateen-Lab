@@ -132,35 +132,43 @@ body.hide-cost .c-cost{visibility:hidden}
   .brand img{width:44px;height:44px} .brand b{font-size:18px}
 }
 
-/* ===== الطباعة ===== */
+/* ===== الطباعة: صفحات مرسومة يدوياً بارتفاعات ثابتة بالمليمتر — ما بنعتمد على تقسيم المتصفح ===== */
 #printArea{display:none}
 @media print{
-  @page{size:A4;margin:8mm 8mm 8mm}
-  body{background:#fff}
+  @page{size:A4;margin:12mm}
+  html,body{background:#fff}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
-.p-head{display:flex;align-items:center;justify-content:space-between;border-bottom:2.5px solid var(--plum);padding-bottom:2.4mm;margin-bottom:3mm}
+.p-page{width:182mm;height:258mm;display:flex;flex-direction:column;overflow:hidden;
+  break-inside:avoid;page-break-inside:avoid;font-family:var(--body);color:var(--ink)}
+.p-page + .p-page{break-before:page;page-break-before:always}
+.p-head{height:20mm;margin-bottom:3mm;flex:none;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:.7mm solid var(--plum)}
 .p-brand{display:flex;align-items:center;gap:3mm}
 .p-brand img{width:15mm;height:15mm;border-radius:50%}
 .p-brand b{display:block;font-family:var(--display);font-weight:900;font-size:17pt;color:var(--plum);line-height:1.1}
 .p-brand span{display:block;font-size:9.5pt;color:var(--gold);font-weight:800}
 .p-title{text-align:left}
 .p-title b{display:block;font-family:var(--display);font-weight:900;font-size:14pt;color:var(--pink)}
-.p-title span{font-size:9pt;color:var(--muted);font-weight:700}
-.p-cols{columns:2;column-gap:6mm}
-.p-sec{break-inside:avoid;margin-bottom:2.4mm}
-.p-sec h3{font-family:var(--display);font-weight:900;font-size:10pt;color:#fff;background:var(--plum);
-  border-radius:2mm 2mm 0 0;padding:.9mm 3mm}
-.p-sec table{width:100%;border-collapse:collapse;font-size:8.9pt}
-.p-sec th{font-size:7.4pt;color:var(--muted);font-weight:800;text-align:center;padding:.6mm 1.5mm;background:var(--soft);white-space:nowrap}
-.p-sec th:first-child{text-align:right}
-.p-sec td{padding:.78mm 1.5mm;border-bottom:.3mm solid var(--line);font-weight:700;color:var(--ink)}
-.p-sec td.v{text-align:center;font-weight:800;direction:ltr;white-space:nowrap;font-variant-numeric:tabular-nums;width:17mm}
-.p-sec tr:nth-child(even) td{background:#FCF8FB}
-.p-foot{margin-top:2.5mm;border-top:.4mm solid var(--line);padding-top:2.5mm;display:flex;justify-content:space-between;
-  font-size:9pt;color:var(--muted);font-weight:700}
+.p-title span{font-size:8.6pt;color:var(--muted);font-weight:700}
+.p-body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;column-gap:6mm;overflow:hidden}
+.p-col{min-width:0}
+.p-sec{margin-bottom:2.4mm}
+.p-sec h3{height:6.4mm;line-height:6.4mm;padding:0 3mm;font-family:var(--display);font-weight:900;font-size:10pt;
+  color:#fff;background:var(--plum);border-radius:2mm 2mm 0 0;white-space:nowrap;overflow:hidden}
+.p-sec h3 small{font-size:8pt;font-weight:700;opacity:.8}
+.p-r{display:grid;align-items:center;height:5.6mm;padding:0 1.5mm;border-bottom:.25mm solid var(--line);overflow:hidden}
+.p-r.z{background:#FCF8FB}
+.p-r > span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-n{font-size:8.6pt;font-weight:700}
+.p-r .v{text-align:center;font-size:8.8pt;font-weight:800;direction:ltr;font-variant-numeric:tabular-nums}
+.p-ch{height:4.6mm;background:var(--soft);border-bottom:0}
+.p-ch > span{font-size:7.2pt;font-weight:800;color:var(--muted);text-align:center}
+.p-ch > span:first-child{text-align:right}
+.p-foot{height:7mm;margin-top:2mm;flex:none;border-top:.35mm solid var(--line);display:flex;align-items:center;
+  justify-content:space-between;font-size:8.6pt;color:var(--muted);font-weight:700}
 .p-foot .ph{direction:ltr;font-weight:800;color:var(--plum)}
 </style>
 </head>
@@ -417,22 +425,53 @@ function fmtRange(t){
   if(a && b && a !== b) return `${a} – ${b}`;
   return a || b || '—';
 }
+/* كل الارتفاعات بالمليمتر ومطابقة للـ CSS فوق، فبنعرف بالضبط كم سطر بيوسع كل عمود */
+const MM = { page:258, head:23, foot:9, sh:6.4, ch:4.6, row:5.6, gap:2.4 };
 function buildPrint(opt){
   const cols = [];
   if(opt.range) cols.push(['مدى السعر', fmtRange]);
   if(opt.l2l) cols.push(['لاب تو لاب', t => t.l2l || '—']);
+  const gtc = 'minmax(0,1fr) ' + cols.map(() => '16mm').join(' ');
+  const secs = sections().map(sec => ({ sec, items: state.tests.filter(t => t.sec === sec) })).filter(x => x.items.length);
+
+  // توزيع الأقسام على الأعمدة والصفحات
+  const pages = []; let page, colIdx, avail;
+  const startCol = () => { avail = (pages.length === 1 ? MM.page - MM.head - MM.foot : MM.page - MM.foot) - 0.8; };
+  const newPage = () => { page = { cols:[[],[]] }; pages.push(page); colIdx = 0; startCol(); };
+  const nextCol = () => { if(colIdx === 0){ colIdx = 1; startCol(); } else newPage(); };
+  newPage();
+  const over = MM.sh + MM.ch + MM.gap;
+  for(const s of secs){
+    let i = 0, cont = false;
+    while(i < s.items.length){
+      const left = s.items.length - i;
+      if(avail < over + Math.min(2, left) * MM.row){ nextCol(); continue; }
+      const take = Math.min(Math.floor((avail - over) / MM.row), left);
+      page.cols[colIdx].push({ sec:s.sec, cont, items:s.items.slice(i, i + take) });
+      avail -= over + take * MM.row; i += take; cont = true;
+      if(i < s.items.length) nextCol();
+    }
+  }
+
   const d = new Date();
   const date = d.toLocaleDateString('ar-EG-u-nu-latn',{year:'numeric',month:'long',day:'numeric'});
-  const body = sections().map(sec => {
-    const items = state.tests.filter(t => t.sec === sec); if(!items.length) return '';
-    return `<div class="p-sec"><h3>${esc(sec)}</h3><table><thead><tr><th>الفحص</th>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead>
-      <tbody>${items.map(t => `<tr><td>${esc(t.name)}</td>${cols.map(c=>`<td class="v">${esc(c[1](t))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  }).join('');
-  $('#printArea').innerHTML = `
-    <div class="p-head"><div class="p-brand"><img src="${LOGO}" alt=""><div><b>مختبر الوتين الطبي</b><span>للتحاليل الطبية</span></div></div>
-      <div class="p-title"><b>${esc(opt.title)}</b><span>الأسعار بالشيكل ₪ · تاريخ التحديث: ${date}</span></div></div>
-    <div class="p-cols">${body}</div>
-    <div class="p-foot"><span>${ADDR}</span><span class="ph">${PHONES}</span></div>`;
+  const head = `<div class="p-head"><div class="p-brand"><img src="${LOGO}" alt=""><div><b>مختبر الوتين الطبي</b><span>للتحاليل الطبية</span></div></div>
+    <div class="p-title"><b>${esc(opt.title)}</b><span>الأسعار بالشيكل ₪ · تاريخ التحديث: ${date}</span></div></div>`;
+  const secHTML = b => `<div class="p-sec"><h3>${esc(b.sec)}${b.cont ? ' <small>(تابع)</small>' : ''}</h3>
+    <div class="p-r p-ch" style="grid-template-columns:${gtc}"><span>الفحص</span>${cols.map(c => `<span>${c[0]}</span>`).join('')}</div>
+    ${b.items.map((t,k) => `<div class="p-r${k % 2 ? ' z' : ''}" style="grid-template-columns:${gtc}"><span class="p-n">${esc(t.name)}</span>${cols.map(c => `<span class="v">${esc(c[1](t))}</span>`).join('')}</div>`).join('')}</div>`;
+  $('#printArea').innerHTML = pages.map((p, pi) => `<div class="p-page">${pi === 0 ? head : ''}
+    <div class="p-body"><div class="p-col">${p.cols[0].map(secHTML).join('')}</div><div class="p-col">${p.cols[1].map(secHTML).join('')}</div></div>
+    <div class="p-foot"><span>${ADDR}</span><span>${pages.length > 1 ? `صفحة ${pi + 1} من ${pages.length}` : ''}</span><span class="ph">${PHONES}</span></div></div>`).join('');
+
+  // اسم طويل؟ نصغّر خطه شوي بدل ما ينقص
+  const pa = $('#printArea');
+  pa.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;visibility:hidden';
+  pa.querySelectorAll('.p-n').forEach(el => {
+    let sz = 8.6;
+    while(el.scrollWidth > el.clientWidth + 0.5 && sz > 6.6){ sz -= 0.3; el.style.fontSize = sz + 'pt'; }
+  });
+  pa.style.cssText = '';
 }
 let printOpt = { range:true, l2l:true, title:'قائمة أسعار الفحوصات' };
 function syncTitle(){
@@ -451,8 +490,7 @@ $('#prOk').addEventListener('click', () => {
   buildPrint(printOpt);
   setTimeout(() => window.print(), 60);
 });
-window.addEventListener('beforeprint', () => { if(!$('#printArea').innerHTML) buildPrint(printOpt); });
-window.addEventListener('afterprint', () => { $('#printArea').innerHTML = ''; });
+window.addEventListener('beforeprint', () => buildPrint(printOpt));
 document.addEventListener('keydown', e => { if(e.key === 'Escape'){ $('#addDlg').hidden = true; $('#prDlg').hidden = true; } });
 
 window.__buildPrint = buildPrint;
